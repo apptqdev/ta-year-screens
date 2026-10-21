@@ -1808,7 +1808,7 @@ class PortraitStage {
       case 'stat': {
         const rows = (s.groupList || groupsOf(this.centre)).map(L => ({ g: yn + L, letter: L, v: +((s.values || {})[L]) || 0, c: suffixColor(L) }));
         const max = s.unit === '%' ? 100 : Math.max(1, ...rows.map(r => r.v)) * 1.08;
-        return wrap('p-stat', pad(...head(s.metric, s.title), h('div', { class: 'stat-rows' + (rows.length > 8 ? ' many' : '') }, raceRows(rows, max, s.unit))));
+        return wrap('p-stat', pad(...head(s.metric, s.title), h('div', { class: 'stat-rows' + (rows.length > 8 ? ' many' : '') }, raceRows(rows, max, s.unit, 'We\u2019re #1!'))));
       }
       case 'breakdown': {
         const segs = (s.segments || []).filter(x => x.label || +x.value).map((x, k) => ({ label: x.label, v: +x.value || 0, c: SEG[k % SEG.length] }));
