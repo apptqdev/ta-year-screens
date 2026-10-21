@@ -290,6 +290,17 @@ table.lt th { color: var(--muted); font-size: .78rem; text-transform: uppercase;
 @keyframes raceBob { from { translate: 0 0; rotate: -5deg; } to { translate: 0 -10px; rotate: 5deg; } }
 @keyframes raceCheer { 0%, 100% { translate: 0 0; scale: 1; rotate: 0deg; } 40% { translate: 0 -34px; scale: 1.2; rotate: -8deg; } 70% { translate: 0 0; scale: 1.06; rotate: 6deg; } }
 @media (prefers-reduced-motion: reduce) { .slide.on .srow .fill, .slide.on .srow .mascot { animation: none !important; } }
+/* The winning house's mascot holds up a sign at the finish (Adam, Oct 2026). It travels with the mascot, pops up as
+   the race ends and waves gently until the slide moves on. */
+.srow .sign { position: absolute; bottom: calc(50% + 74px); z-index: 3; translate: -62% 0; transform-origin: 50% 100%;
+  background: #F2CF7A; color: #111214; font-family: var(--display); font-weight: 700; font-size: 38px; line-height: 1; white-space: nowrap;
+  padding: 12px 20px; border-radius: 12px; box-shadow: 0 8px 18px -6px rgba(0,0,0,.6); opacity: 0; }
+.srow .sign::after { content: ""; position: absolute; left: 50%; top: 100%; width: 8px; height: 50px; margin-left: -4px; background: #8A6400; border-radius: 3px; }
+.slide.on .srow .sign { animation: raceRun 2.4s cubic-bezier(.25,.8,.25,1) var(--d, 0s) both, signUp .5s cubic-bezier(.2,1.6,.4,1) calc(var(--d, 0s) + 2.45s) both, signWave 1.6s ease-in-out calc(var(--d, 0s) + 2.95s) infinite; }
+@keyframes signUp { from { opacity: 0; scale: .2; } to { opacity: 1; scale: 1; } }
+@keyframes signWave { 0%, 100% { rotate: -6deg; } 50% { rotate: 6deg; } }
+@media (prefers-reduced-motion: reduce) { .slide.on .srow .sign { animation: none !important; opacity: 1; } }
+
 .stat-rows.many { gap: 12px; }
 .stat-rows.many .srow { font-size: 34px; }
 .stat-rows.many .track { height: 42px; border-radius: 12px; }
@@ -1717,13 +1728,15 @@ function countUp(slide) {
   };
   requestAnimationFrame(step);
 }
-function raceRows(rows, max, unit) {
+function raceRows(rows, max, unit, sign) {
   const top = Math.max(...rows.map(r => r.v));
   return rows.map((r, i) => {
     const pct = Math.max(0, Math.min(100, r.v / max * 100));
     const m = mascot(r.letter); if (m) m.style.left = pct + '%';
+    const lead = r.v === top && top > 0 && rows.filter(x => x.v === top).length === 1; // no sign on a tie
+    const sg = sign && lead && m ? h('div', { class: 'sign', style: 'left:' + pct + '%', text: sign }) : null;
     return h('div', { class: 'srow' + (r.v === top && top > 0 ? ' top' : ''), style: '--c:' + r.c + ';--d:' + (i * .15).toFixed(2) + 's' },
-      h('span', { class: 'g', text: r.g }), h('div', { class: 'track' }, h('div', { class: 'fill', style: 'width:' + pct.toFixed(1) + '%' }), m),
+      h('span', { class: 'g', text: r.g }), h('div', { class: 'track' }, h('div', { class: 'fill', style: 'width:' + pct.toFixed(1) + '%' }), m, sg),
       h('span', { class: 'v', text: fmtNum(r.v) + (unit || ''), 'data-n': r.v, 'data-u': unit || '', 'data-d': i * .15 }));
   });
 }
@@ -1841,7 +1854,7 @@ class PortraitStage {
       case 'housepoints': {
         const hp = this.centre.housePoints || {};
         const rows = HOUSES.map(([n, col], k) => ({ g: n, letter: GROUP_LETTERS[k], v: +hp[n] || 0, c: col })).sort((a, b) => b.v - a.v);
-        const r = h('div', { class: 'stat-rows houses' }, raceRows(rows, Math.max(1, ...rows.map(x => x.v)) * 1.08, ''));
+        const r = h('div', { class: 'stat-rows houses' }, raceRows(rows, Math.max(1, ...rows.map(x => x.v)) * 1.08, '', 'We\u2019re #1!'));
         return wrap('p-stat', pad(...head(yearName(this.year), s.title || 'House points'), r));
       }
       case 'sotw': {
