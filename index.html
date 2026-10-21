@@ -280,6 +280,16 @@ table.lt th { color: var(--muted); font-size: .78rem; text-transform: uppercase;
 .srow .v { text-align: right; font-family: var(--display); font-weight: 700; font-variant-numeric: tabular-nums; }
 .srow.top .v { color: var(--rose); }
 .srow.top .v::before { content: "\2605 "; font-size: .7em; vertical-align: .15em; }
+/* Race slides (house points, Sparx, Tassomai): when the slide comes on, the bars grow and the mascots run from the left,
+   one row just after another, the totals count up, and the leader's mascot celebrates at the finish (Headteacher, Oct 2026). */
+.slide.on .srow .fill { animation: raceFill 2.4s cubic-bezier(.25,.8,.25,1) var(--d, 0s) both; }
+.slide.on .srow .mascot { animation: raceRun 2.4s cubic-bezier(.25,.8,.25,1) var(--d, 0s) both, raceBob .28s ease-in-out var(--d, 0s) 8 alternate; }
+.slide.on .srow.top .mascot { animation: raceRun 2.4s cubic-bezier(.25,.8,.25,1) var(--d, 0s) both, raceBob .28s ease-in-out var(--d, 0s) 8 alternate, raceCheer .7s ease-in-out calc(var(--d, 0s) + 2.5s) 3; }
+@keyframes raceFill { from { width: 0; } }
+@keyframes raceRun { from { left: 0; } }
+@keyframes raceBob { from { translate: 0 0; rotate: -5deg; } to { translate: 0 -10px; rotate: 5deg; } }
+@keyframes raceCheer { 0%, 100% { translate: 0 0; scale: 1; rotate: 0deg; } 40% { translate: 0 -34px; scale: 1.2; rotate: -8deg; } 70% { translate: 0 0; scale: 1.06; rotate: 6deg; } }
+@media (prefers-reduced-motion: reduce) { .slide.on .srow .fill, .slide.on .srow .mascot { animation: none !important; } }
 .stat-rows.many { gap: 12px; }
 .stat-rows.many .srow { font-size: 34px; }
 .stat-rows.many .track { height: 42px; border-radius: 12px; }
@@ -1691,14 +1701,30 @@ function infoBody(body) {
   return out;
 }
 const mascot = letter => { const id = store.mascots && store.mascots[letter]; return id ? h('img', { class: 'mascot', src: photoUrl(id), alt: '' }) : null; };
+// Race totals count up from 0 alongside the bars (same timing as the raceFill animation).
+function countUp(slide) {
+  const vs = [...slide.querySelectorAll('.srow .v[data-n]')];
+  if (!vs.length || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const t0 = performance.now(), ease = t => 1 - Math.pow(1 - t, 3);
+  const step = now => {
+    let busy = false;
+    for (const v of vs) {
+      const t = Math.min(1, Math.max(0, (now - t0) / 1000 - +v.dataset.d) / 2.4), n = +v.dataset.n;
+      v.textContent = fmtNum(t >= 1 ? n : Math.round(n * ease(t))) + v.dataset.u; if (t < 1) busy = true;
+    }
+    if (busy && slide.isConnected && slide.classList.contains('on')) requestAnimationFrame(step);
+    else vs.forEach(v => v.textContent = fmtNum(+v.dataset.n) + v.dataset.u);
+  };
+  requestAnimationFrame(step);
+}
 function raceRows(rows, max, unit) {
   const top = Math.max(...rows.map(r => r.v));
-  return rows.map(r => {
+  return rows.map((r, i) => {
     const pct = Math.max(0, Math.min(100, r.v / max * 100));
     const m = mascot(r.letter); if (m) m.style.left = pct + '%';
-    return h('div', { class: 'srow' + (r.v === top && top > 0 ? ' top' : ''), style: '--c:' + r.c },
+    return h('div', { class: 'srow' + (r.v === top && top > 0 ? ' top' : ''), style: '--c:' + r.c + ';--d:' + (i * .15).toFixed(2) + 's' },
       h('span', { class: 'g', text: r.g }), h('div', { class: 'track' }, h('div', { class: 'fill', style: 'width:' + pct.toFixed(1) + '%' }), m),
-      h('span', { class: 'v', text: fmtNum(r.v) + (unit || '') }));
+      h('span', { class: 'v', text: fmtNum(r.v) + (unit || ''), 'data-n': r.v, 'data-u': unit || '', 'data-d': i * .15 }));
   });
 }
 
@@ -1828,7 +1854,7 @@ class PortraitStage {
     return wrap('p-welcome', pad(h('div', { class: 's-eyebrow', text: 'Welcome' }), h('div', { class: 's-title', text: yearName(this.year) }), h('p', { class: 'info-p', text: 'Slides for this screen will appear here once your year team adds them.' })));
   }
   show() {
-    [...$('.slides', this.el).children].forEach((el, i) => el.classList.toggle('on', i === this.idx));
+    [...$('.slides', this.el).children].forEach((el, i) => { const was = el.classList.contains('on'); el.classList.toggle('on', i === this.idx); if (i === this.idx && !was) countUp(el); });
     [...$('.spot-dots', this.el).children].forEach((el, i) => el.classList.toggle('on', i === this.idx));
   }
   renderNext(force) {
