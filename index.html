@@ -234,6 +234,7 @@ table.lt th { color: var(--muted); font-size: .78rem; text-transform: uppercase;
   background: radial-gradient(circle at 50% 40%, #3A4A63, #232C3B 45%, #0E1116 100%); color: #fff; animation: to-in .5s ease-out; } /* charcoal and gold, not burgundy (Headteacher, 9 Oct 2026) */
 .takeover .ta-logo { height: 18vmin; filter: invert(1); }
 .to-text { font-family: var(--display); font-weight: 700; font-size: 13vmin; line-height: 1; letter-spacing: -.02em; max-width: 16ch; text-wrap: balance; animation: to-pulse 2s ease-in-out infinite; }
+.to-pre { font-family: var(--display); font-weight: 700; font-size: 6vmin; line-height: 1; color: #F2CF7A; margin-bottom: -1vmin; }
 .to-sub { font-weight: 600; font-size: 2.6vmin; letter-spacing: .22em; text-transform: uppercase; color: #F2CF7A; }
 @keyframes to-in { from { opacity: 0; transform: scale(1.04); } }
 @keyframes to-pulse { 50% { transform: scale(1.04); } }
@@ -423,7 +424,7 @@ select { background: var(--bg); border: 1px solid var(--line); border-radius: 7p
 .datebar select { max-width: 100%; } .datebar input { width: auto; flex: 0 1 auto; }
 .frame { container-type: size; }
 .frame .takeover { position: absolute; z-index: 30; gap: 4cqmin; padding: 6cqmin; }
-.frame .takeover .ta-logo { height: 18cqmin; } .frame .takeover .to-text { font-size: 13cqmin; } .frame .takeover .to-sub, .frame .takeover.remembrance .to-sub { font-size: 3.4cqmin; } .frame .to-poppy { width: 30cqmin; }
+.frame .takeover .ta-logo { height: 18cqmin; } .frame .takeover .to-text { font-size: 13cqmin; } .frame .takeover .to-pre { font-size: 6cqmin; margin-bottom: -1cqmin; } .frame .takeover .to-sub, .frame .takeover.remembrance .to-sub { font-size: 3.4cqmin; } .frame .to-poppy { width: 30cqmin; }
 /* awareness day posters (right-hand screens) */
 .slide.aware { color: #fff; background: radial-gradient(900px 760px at 50% 18%, var(--a2), transparent 62%), linear-gradient(165deg, var(--a1), var(--a3)); overflow: hidden; }
 .aw { height: 100%; box-sizing: border-box; padding: 56px 64px 130px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 28px; text-align: center; }
@@ -491,7 +492,7 @@ const BELLS = [
 // Full-screen messages every TV shows at set times on school days (Monday to Friday), for `minutes` minutes.
 // An entry with a `date` shows on that day only (any weekday), and `kind` gives it its own look.
 const TAKEOVERS = [
-  { at: '08:15', minutes: 2, text: 'Go To Line Up 1' },
+  { at: '08:15', minutes: 2, pre: 'Good morning', text: 'Go To Line Up 1' }, // 'Good morning' above it (Adam, 9 Nov 2026)
   { date: '2026-11-11', at: '10:59', minutes: 4, text: 'Two minutes\u2019 silence', sub: 'We will remember them', kind: 'remembrance' }, // Armistice Day, 10:59 to 11:03
 ];
 function activeTakeover(now = new Date()) {
@@ -1389,7 +1390,7 @@ function datePreviewBar(stage, frame, side, openLink, key) {
   const reset = h('button', { class: 'btn small ghost', type: 'button', text: 'Back to today' });
   // A copy of the full-screen message, sized to the preview.
   const poppy = h('div', { class: 'to-poppy', hidden: true }); poppy.innerHTML = AWARENESS_DAYS.find(a => a.key === 'armistice').art;
-  const to = h('div', { class: 'takeover', hidden: true }, logoImg(), poppy, h('div', { class: 'to-text' }), h('div', { class: 'to-sub' }));
+  const to = h('div', { class: 'takeover', hidden: true }, logoImg(), poppy, h('div', { class: 'to-pre', hidden: true }), h('div', { class: 'to-text' }), h('div', { class: 'to-sub' }));
   frame.append(to);
   const apply = () => {
     previewDate = date.value || null;
@@ -1398,7 +1399,7 @@ function datePreviewBar(stage, frame, side, openLink, key) {
     stage.slideKey = null; stage.buildSlides(); stage.tick();
     const t = previewDate ? activeTakeover() : null;
     to.hidden = !t;
-    if (t) { $('.to-text', to).textContent = t.text; $('.to-sub', to).textContent = t.sub || VALUES_LINE; to.className = 'takeover' + (t.kind ? ' ' + t.kind : '');
+    if (t) { $('.to-pre', to).textContent = t.pre || ''; $('.to-pre', to).hidden = !t.pre; $('.to-text', to).textContent = t.text; $('.to-sub', to).textContent = t.sub || VALUES_LINE; to.className = 'takeover' + (t.kind ? ' ' + t.kind : '');
       poppy.hidden = t.kind !== 'remembrance'; $('.ta-logo', to).hidden = t.kind === 'remembrance'; }
     reset.hidden = !previewDate;
     openLink.href = '#' + key + (previewDate ? '@' + previewDate + (previewTime != null ? 'T' + time.value.slice(0, 5) : '') : '');
@@ -1999,14 +2000,14 @@ function viewScreen(y, side) {
   };
   listeners.add(fill); subscribe(y); fill();
   const poppy = h('div', { class: 'to-poppy', hidden: true }); poppy.innerHTML = AWARENESS_DAYS.find(a => a.key === 'armistice').art;
-  const takeover = h('div', { class: 'takeover', hidden: true, role: 'alert' }, logoImg(), poppy, h('div', { class: 'to-text' }), h('div', { class: 'to-sub', text: VALUES_LINE }));
+  const takeover = h('div', { class: 'takeover', hidden: true, role: 'alert' }, logoImg(), poppy, h('div', { class: 'to-pre', hidden: true }), h('div', { class: 'to-text' }), h('div', { class: 'to-sub', text: VALUES_LINE }));
   app.append(takeover);
   let shown = null;
   const checkTakeover = () => {
     const t = activeTakeover();
     if (t === shown) return; shown = t;
     takeover.hidden = !t; if (!t) return;
-    $('.to-text', takeover).textContent = t.text; $('.to-sub', takeover).textContent = t.sub || VALUES_LINE;
+    $('.to-pre', takeover).textContent = t.pre || ''; $('.to-pre', takeover).hidden = !t.pre; $('.to-text', takeover).textContent = t.text; $('.to-sub', takeover).textContent = t.sub || VALUES_LINE;
     takeover.className = 'takeover' + (t.kind ? ' ' + t.kind : '');
     poppy.hidden = t.kind !== 'remembrance'; $('.ta-logo', takeover).hidden = t.kind === 'remembrance';
   };
