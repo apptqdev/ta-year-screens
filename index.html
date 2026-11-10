@@ -1031,6 +1031,7 @@ function signInForm() {
   setTimeout(() => email.focus(), 0);
   return [h('p', { text: 'Sign in to see and edit the screens. Each TV signs in once with its own view-only account.' }), form];
 }
+const displayProblem = () => { const B = window.SCREENS_BACKEND || {}; return B.displayProblem ? B.displayProblem() : ''; };
 function signOutLink() {
   const B = window.SCREENS_BACKEND || {};
   return B.signOut ? h('button', { class: 'linkish', type: 'button', text: 'Sign out', onclick: () => B.signOut() }) : null;
@@ -1048,6 +1049,7 @@ function viewLogin(a, want) {
   const draw = a => {
     let body;
     if (a.state === 'loading') body = [h('p', { text: 'Checking your sign-in…' })];
+    else if (a.state === 'signedout' && displayProblem()) body = [h('p', { text: displayProblem() })];
     else if (a.state === 'signedout') body = signInForm();
     else if (a.state === 'viewonly') body = [whoChip(a.me),
       h('p', { text: 'This account can view the screens but not change them. Ask the screens administrator to give you edit access.' })];
@@ -1056,6 +1058,7 @@ function viewLogin(a, want) {
     else body = [whoChip(a.me),
       h('p', { text: want && !a.years.includes(want) ? 'You can\'t edit ' + yearName(want) + '. Choose one of your screens:' : 'Choose the screens to edit:' }),
       h('div', { class: 'years-go' }, a.years.map(editLink), TUTOR_SLIDES ? null : h('a', { class: 'btn', href: '#homework', text: 'Homework' })),
+      a.admin && (window.SCREENS_BACKEND || {}).displays ? h('a', { class: 'btn ghost', href: '#displays', text: 'TV links (no sign-in on the TVs)' }) : null,
       ];
     app.replaceChildren(signinShell(...body));
   };
@@ -1175,6 +1178,77 @@ function viewStaff() {
   });
 }
 
+
+// TV links: one link per TV, with its own key, so the TV shows its screen without signing in and can never be signed
+// out (Adam, 10 Nov 2026, after every TV was signed out at once). Admins create, copy and switch them off here.
+const SCREEN_NAMES = YEARS.flatMap(y => [[y + '-left', yearName(y) + ' left'], [y, yearName(y) + ' centre'], [y + '-right', yearName(y) + ' right']]);
+const screenName = k => (SCREEN_NAMES.find(s => s[0] === k) || [k, k])[1];
+const tvLink = k => location.origin + location.pathname + '?key=' + k.key + '#' + k.screen;
+function seenText(iso) {
+  if (!iso) return 'Not used yet';
+  const m = Math.round((Date.now() - new Date(iso)) / 60e3);
+  return m < 5 ? 'On now' : m < 60 ? 'Last seen ' + m + ' min ago' : m < 1440 ? 'Last seen ' + Math.round(m / 60) + ' h ago'
+    : 'Last seen ' + new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+}
+function viewDisplays() {
+  const tok = routeTok;
+  viewLogin({ state: 'loading' });
+  getAccess().then(async a => {
+    if (tok !== routeTok) return;
+    if (!(a.state === 'ok' && a.admin)) { viewLogin(a.state === 'ok' ? { ...a, admin: false } : a); return; }
+    const D = (window.SCREENS_BACKEND || {}).displays;
+    const status = h('span', { class: 'note', role: 'status' });
+    const list = h('div', { class: 'staff-list' });
+    const say = (t, cls = '') => { status.textContent = t; status.className = 'note ' + cls; };
+    const fail = e => say(/display_keys|schema cache|does not exist/i.test((e && e.message) || '') ? 'TV links aren\'t set up yet. Run supabase/display-keys.sql in Supabase first.' : 'That didn\'t work: ' + ((e && e.message) || e), 'bad');
+    let rows = [];
+    async function load() {
+      if (!D) { list.replaceChildren(h('p', { class: 'note', text: 'TV links need the live site (they aren\'t available in demo mode).' })); return; }
+      try { rows = await D.list(); } catch (e) { fail(e); rows = []; }
+      if (tok !== routeTok) return;
+      list.replaceChildren(...(rows.length ? rows.map(k => {
+        const copy = h('button', { class: 'btn small', type: 'button', text: 'Copy link', disabled: k.disabled, onclick: async () => {
+          try { await navigator.clipboard.writeText(tvLink(k)); say('Link for ' + (k.label || screenName(k.screen)) + ' copied.', 'ok'); }
+          catch (e) { window.prompt('Copy this link:', tvLink(k)); } } });
+        const off = h('button', { class: 'btn small ghost', type: 'button', text: k.disabled ? 'Switch on' : 'Switch off', onclick: async () => {
+          try { await D.setOff(k.id, !k.disabled); say(k.disabled ? 'Switched on.' : 'Switched off. That TV will stop showing the screen within a few minutes.', 'ok'); load(); } catch (e) { fail(e); } } });
+        const del = h('button', { class: 'btn small ghost', type: 'button', text: 'Delete', onclick: async () => {
+          if (!k.disabled) { say('Switch a link off before deleting it.'); return; }
+          try { await D.remove(k.id); load(); } catch (e) { fail(e); } } });
+        return h('div', { class: 'staff-row', style: k.disabled ? 'opacity:.6' : '' },
+          h('div', { style: 'min-width:0' }, h('b', { text: screenName(k.screen) }), k.label ? h('span', { class: 'note', text: ' · ' + k.label }) : null,
+            h('div', { class: 'note', text: k.disabled ? 'Switched off' : seenText(k.last_seen) })),
+          h('div', { class: 'yrs' }, copy, off), del);
+      }) : [h('p', { class: 'note', text: 'No TV links yet. Create one for each TV below, or all fifteen at once.' })]));
+    }
+    const pick = h('select', { id: 'tv-screen' }, SCREEN_NAMES.map(([v, t]) => h('option', { value: v, text: t })));
+    const label = h('input', { type: 'text', id: 'tv-label', placeholder: 'Where is it? (optional)', maxlength: 60 });
+    const make = h('button', { class: 'btn primary', type: 'button', text: 'Create link', onclick: async () => {
+      make.disabled = true;
+      try { const k = await D.create(pick.value, label.value.trim()); label.value = ''; await load();
+        try { await navigator.clipboard.writeText(tvLink(k)); say('Created and copied. Open it on the TV.', 'ok'); } catch (e) { say('Created. Use Copy link to copy it.', 'ok'); } }
+      catch (e) { fail(e); }
+      make.disabled = false;
+    } });
+    const all = h('button', { class: 'btn', type: 'button', text: 'Create one for every screen', onclick: async () => {
+      const have = new Set(rows.filter(k => !k.disabled).map(k => k.screen));
+      const need = SCREEN_NAMES.map(s => s[0]).filter(s => !have.has(s));
+      if (!need.length) { say('Every screen already has a link.'); return; }
+      all.disabled = true;
+      try { for (const s of need) await D.create(s, ''); say('Created ' + need.length + ' link' + (need.length === 1 ? '' : 's') + '.', 'ok'); } catch (e) { fail(e); }
+      all.disabled = false; load();
+    } });
+    app.replaceChildren(h('div', { class: 'wrap', style: 'max-width:900px' },
+      h('div', { class: 'topbar' }, h('div', { class: 'brand' }, stripe(), h('div', {}, h('h1', { text: 'TV links' }), h('div', { class: 'tagline', text: 'screens that never need signing in' }))),
+        h('div', { style: 'display:flex;gap:10px;align-items:center;flex-wrap:wrap' }, whoChip(a.me), h('a', { class: 'btn ghost', href: '#', text: 'Back' }), themeBtn())),
+      h('p', { class: 'note', style: 'margin-top:18px' }, 'Give each TV its own link and open it on that TV (set it as the start page). The TV then shows its screen without signing in, so it can\'t be signed out. A link can only show that screen; editing still needs signing in. Anyone with a link can view the screen, so keep links within school, and switch one off if it gets out.'),
+      list,
+      h('div', { class: 'addrow' }, h('label', { class: 'f', for: 'tv-screen' }, 'Screen', pick), h('label', { class: 'f', for: 'tv-label', style: 'flex:1' }, 'Label', label), make, all),
+      h('p', { style: 'margin-top:14px' }, status)));
+    load();
+    const t = setInterval(() => { if (tok !== routeTok) clearInterval(t); else load(); }, 60e3);
+  });
+}
 
 // ---------- next lesson logic ----------
 // ---------- school calendar 2026-27 ----------
@@ -1922,6 +1996,7 @@ function route() {
     return;
   }
   if (hash === 'staff') return viewStaff();
+  if (hash === 'displays') return viewDisplays();
   // The home page is the year chooser; every screen and the homework uploads are under All screens.
   if (hash === 'all') return viewHome();
   if (hash === 'homework') return viewHomework();

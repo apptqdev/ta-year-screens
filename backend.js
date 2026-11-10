@@ -13,6 +13,11 @@
   const isFeed = p => SHARED && /^(housepoints|birthdays|homework)\//.test(p);
   const refused = () => Object.assign(new Error('Not allowed'), { code: 'invalid_argument' });
   const snap = d => ({ exists: d != null, data: () => d });
+  // TV display links (supabase/display-keys.sql): a screen link with ?key=… shows that screen with no sign-in at all, so a
+  // TV can never be signed out. The key only lets it read what the screens show; editing still needs a sign-in.
+  const KEY = (() => { try { return (new URLSearchParams(location.search).get('key') || '').replace(/[^a-z0-9]/gi, ''); } catch (e) { return ''; } })();
+  const isScreenHash = () => /^(y7|y8|y9|y10|y11)(-(left|right))?(@.*)?$/.test(location.hash.slice(1));
+  const DISPLAY = live && SHARED && !!KEY && isScreenHash();
 
   // ---------- demo mode ----------
   function demoBackend() {
@@ -48,12 +53,14 @@
 
   // ---------- Supabase ----------
   function supabaseBackend() {
-    const sb = window.supabase.createClient(CFG.SUPABASE_URL, CFG.SUPABASE_ANON_KEY, { auth: { persistSession: true, autoRefreshToken: true }, db: { schema: SCHEMA } });
+    const sb = DISPLAY
+      ? window.supabase.createClient(CFG.SUPABASE_URL, CFG.SUPABASE_ANON_KEY, { auth: { persistSession: false, autoRefreshToken: false, storageKey: 'ta-display' }, db: { schema: SCHEMA }, global: { headers: { 'x-screen-key': KEY } } })
+      : window.supabase.createClient(CFG.SUPABASE_URL, CFG.SUPABASE_ANON_KEY, { auth: { persistSession: true, autoRefreshToken: true }, db: { schema: SCHEMA } });
     const watchers = {}, cache = {};
     let channel = null;
     const fire = (p, d) => { cache[p] = d; (watchers[p] || []).forEach(fn => fn(snap(d))); };
     function listen() {
-      if (channel) return;
+      if (channel || DISPLAY) return; // display links have no live updates; they re-read every two minutes instead
       channel = sb.channel('screen_docs')
         .on('postgres_changes', { event: '*', schema: SCHEMA, table: 'screen_docs' }, ev => {
           const row = ev.new && ev.new.path ? ev.new : ev.old;
@@ -89,7 +96,15 @@
       loadStaffDoc();
     }
 
-    let session = null, profile = null, problem = '';
+    let session = null, profile = null, problem = '', keyOk = false;
+    // A display link checks in every two minutes: it re-reads everything, and the admin's TV links page shows when each
+    // TV was last seen. If the link has been switched off, the page reloads and says so.
+    async function ping() {
+      const { data, error } = await sb.rpc('display_ping');
+      if (error) { problem = /display_ping|schema cache|does not exist/i.test(error.message || '') ? 'TV links aren\'t set up in Supabase yet (supabase/display-keys.sql).' : 'Can\'t reach the screens database. Trying again shortly.'; return false; }
+      if (data !== true) { problem = 'This TV link has been switched off. Ask the screens administrator for a new one.'; return false; }
+      return true;
+    }
     const people = {};
     const toProfile = r => ({ id: r.user_id, name: r.name || r.email || '', avatarUrl: avatar(r.name || r.email || ''), isMe: !!session && r.user_id === session.user.id, guest: false, email: r.email || null });
     const me = () => {
@@ -102,6 +117,15 @@
       mode: 'live',
       shared: SHARED,
       async init() {
+        if (DISPLAY) {
+          keyOk = await ping();
+          // Not working yet (no network, or switched off): try again in a few minutes, so a TV mends itself.
+          if (!keyOk) { setTimeout(() => location.reload(), 3 * 60e3); return; }
+          setInterval(async () => { if (!(await ping()) && /switched off/.test(problem)) location.reload(); else Object.keys(watchers).forEach(refetch); }, 2 * 60e3);
+          // Leaving the screen (to edit, say) goes back to the normal signed-in site.
+          addEventListener('hashchange', () => { if (!isScreenHash()) location.replace(location.pathname + location.hash); });
+          return;
+        }
         const { data } = await sb.auth.getSession(); session = data.session;
         sb.auth.onAuthStateChange((ev, s) => { const was = session && session.user.id; session = s; if (ev === 'SIGNED_OUT' || (s && s.user.id !== was && was)) location.reload(); });
         const loadProfile = async () => {
@@ -114,7 +138,9 @@
           await loadProfile();
         }
       },
-      signedIn: () => !!session && !!profile,
+      display: DISPLAY,
+      displayProblem: () => DISPLAY && !keyOk ? problem : '',
+      signedIn: () => DISPLAY ? keyOk : !!session && !!profile,
       hasSession: () => !!session,
       problem: () => problem,
       async signIn(email, password) {
@@ -124,7 +150,14 @@
       },
       // Sign out THIS browser only. Supabase's default ('global') ends every session of the account, and every TV
       // shares the one screens account, so one "Sign out" anywhere used to sign out every TV in school (10 Nov 2026).
-      async signOut() { await sb.auth.signOut({ scope: 'local' }); location.reload(); },
+      signOut: DISPLAY ? undefined : async () => { await sb.auth.signOut({ scope: 'local' }); location.reload(); },
+      // TV links page (admins): each row is one TV's link.
+      displays: DISPLAY ? null : {
+        async list() { const { data, error } = await sb.from('display_keys').select('*').order('screen').order('created_at'); if (error) throw error; return data; },
+        async create(screen, label) { const { data, error } = await sb.from('display_keys').insert({ screen, label }).select().single(); if (error) throw error; return data; },
+        async setOff(id, off) { const { error } = await sb.from('display_keys').update({ disabled: off }).eq('id', id); if (error) throw error; },
+        async remove(id) { const { error } = await sb.from('display_keys').delete().eq('id', id); if (error) throw error; },
+      },
       db: { doc: p => ({
         onSnapshot(fn) {
           (watchers[p] = watchers[p] || []).push(fn);

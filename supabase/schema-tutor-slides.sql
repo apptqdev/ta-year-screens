@@ -123,7 +123,7 @@ declare
   today date := (now() at time zone 'Europe/London')::date;
   out  jsonb;
 begin
-  if screens.screen_role() is null then return null; end if;
+  if screens.screen_role() is null and not screens.display_key_ok() then return null; end if; -- signed in, or a TV link
 
   if kind = 'housepoints' then
     if arg !~ '^y(7|8|9|10|11)$' then return null; end if;
@@ -211,8 +211,8 @@ begin
   return null;
 end $$;
 
-revoke all on function screens.shared_doc(text) from public, anon;
-grant execute on function screens.shared_doc(text) to authenticated;
+revoke all on function screens.shared_doc(text) from public;
+grant execute on function screens.shared_doc(text) to anon, authenticated; -- anon only gets data with a working TV link key
 grant execute on function screens.screen_role() to authenticated;
 grant execute on function screens.screen_can_write(text) to authenticated;
 
@@ -308,6 +308,54 @@ revoke all on function screens.legends_due() from public;
 revoke all on function screens.save_legends(text, jsonb) from public;
 grant execute on function screens.legends_due() to anon, authenticated;
 grant execute on function screens.save_legends(text, jsonb) to anon, authenticated;
+
+-- ---------- TV links (no sign-in on the TVs) ----------
+-- Each TV opens its own link, screens.tqacademy.co.uk/?key=…#y7-left, and never signs in, so nothing can sign it out.
+-- The key (sent by the page as the x-screen-key header) only lets it READ what the screens show: the screens' own
+-- content, the Tutor Slides feeds through screens.shared_doc() and the screen images. It cannot edit anything.
+-- Admins create and switch off links on the site's "TV links" page (#displays). A switched-off link stops within minutes.
+create table if not exists screens.display_keys (
+  id         uuid primary key default gen_random_uuid(),
+  key        text not null unique default replace(gen_random_uuid()::text || gen_random_uuid()::text, '-', ''),
+  screen     text not null check (screen ~ '^y(7|8|9|10|11)(-(left|right))?$'),
+  label      text not null default '',
+  disabled   boolean not null default false,
+  created_at timestamptz not null default now(),
+  last_seen  timestamptz
+);
+alter table screens.display_keys enable row level security;
+grant select, insert, update, delete on screens.display_keys to authenticated;
+drop policy if exists "display keys admin" on screens.display_keys;
+create policy "display keys admin" on screens.display_keys for all to authenticated
+  using (screens.screen_role() = 'admin') with check (screens.screen_role() = 'admin');
+
+-- Does this request carry a TV link key that is switched on?
+create or replace function screens.display_key_ok() returns boolean
+language sql stable security definer set search_path = '' as $$
+  select exists (select 1 from screens.display_keys k
+                  where not k.disabled
+                    and k.key = coalesce(nullif(current_setting('request.headers', true), '')::json ->> 'x-screen-key', ''));
+$$;
+-- A TV checks in every two minutes: true while its link works, and the TV links page shows when it was last seen.
+create or replace function screens.display_ping() returns boolean
+language plpgsql volatile security definer set search_path = '' as $$
+begin
+  update screens.display_keys set last_seen = now()
+   where not disabled and key = coalesce(nullif(current_setting('request.headers', true), '')::json ->> 'x-screen-key', '');
+  return found;
+end $$;
+revoke all on function screens.display_key_ok() from public;
+revoke all on function screens.display_ping() from public;
+grant execute on function screens.display_key_ok() to anon, authenticated;
+grant execute on function screens.display_ping() to anon, authenticated;
+
+grant usage on schema screens to anon;
+grant select on screens.screen_docs to anon;
+drop policy if exists "docs read by tv link" on screens.screen_docs;
+create policy "docs read by tv link" on screens.screen_docs for select to anon using ((select screens.display_key_ok()));
+drop policy if exists "screen media read by tv link" on storage.objects;
+create policy "screen media read by tv link" on storage.objects for select to anon
+  using (bucket_id = 'screen-media' and (select screens.display_key_ok()));
 
 -- ---------- starting content ----------
 insert into screens.screen_docs (path, data) values
