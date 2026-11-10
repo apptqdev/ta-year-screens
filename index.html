@@ -1377,7 +1377,7 @@ class Effects {
 
 // ---------- preview on a date (editors) ----------
 // Under each editor's preview: pick a date (and time) to see that day's posters, effects and full-screen messages.
-function datePreviewBar(stage, frame, side, openLink, key) {
+function datePreviewBar(stage, frame, side, openLink, key, onDate) {
   const EFFECT_NAMES = { fireworks: 'Fireworks Night', snow: 'Snow (last week before Christmas)', remembrance: 'Armistice Day (grey screens and poppy)' };
   const special = [
     ...EFFECTS.map(e => ({ label: EFFECT_NAMES[e.key] || e.key, date: e.from })),
@@ -1394,6 +1394,7 @@ function datePreviewBar(stage, frame, side, openLink, key) {
   frame.append(to);
   const apply = () => {
     previewDate = date.value || null;
+    if (previewDate && onDate) onDate(); // play the whole day, not just the selected slide, so that day's poster shows (Adam, 10 Nov 2026)
     const tm = /^(\d{1,2}):(\d{2})/.exec(time.value); previewTime = previewDate && tm ? +tm[1] * 60 + +tm[2] : null;
     stage.fx.off(); stage.fx.cur = null; stage.fx.check();
     stage.slideKey = null; stage.buildSlides(); stage.tick();
@@ -2243,7 +2244,7 @@ function viewEditSide(y, side) {
         h('div', { class: 'savebar' }, saveBtn, openLink, playBtn), status, dateSlot, banner))));
 
   const stage = new PortraitStage(frame, y, side);
-  dateSlot.replaceWith(datePreviewBar(stage, frame, side, openLink, key));
+  dateSlot.replaceWith(datePreviewBar(stage, frame, side, openLink, key, () => focusSlide(null)));
   const refresh = () => stage.setData(draft, store.screens[y], store.lessons[y]);
   let pT; const preview = () => { clearTimeout(pT); pT = setTimeout(refresh, 150); };
   function setStatus(t, cls = '') { status.textContent = t; status.className = 'status ' + cls; }
