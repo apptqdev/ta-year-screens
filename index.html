@@ -265,6 +265,18 @@ table.lt th { color: var(--muted); font-size: .78rem; text-transform: uppercase;
 .pp { padding: 64px 56px 96px; height: 100%; box-sizing: border-box; display: flex; flex-direction: column; gap: 30px; }
 .pp .s-title { font-size: 92px; }
 .pp .s-eyebrow { color: var(--rose); }
+.p-effort { background: var(--tv-card); }
+.ef-band { background: var(--c); color: var(--ink); display: flex; align-items: center; gap: 28px; padding: 30px 48px; }
+.ef-star { width: 104px; height: 104px; flex: none; border-radius: 50%; background: rgba(128,128,128,.22); position: relative; }
+.ef-star::after { content: "\2605"; position: absolute; inset: 0; display: grid; place-items: center; font-size: 72px; line-height: 1; color: currentColor; }
+.ef-eb { font-size: 28px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; opacity: .85; }
+.ef-title { font-family: var(--display); font-weight: 700; font-size: 92px; line-height: 1; letter-spacing: -.02em; margin-top: 6px; white-space: nowrap; }
+.ef-count { margin-left: auto; font-family: var(--display); font-weight: 700; font-size: 84px; line-height: 1; }
+.ef-names { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; padding: 22px 32px; align-content: start; }
+.ef-nm { display: flex; align-items: baseline; gap: 12px; background: var(--wash); border-left: 8px solid var(--c); border-radius: 10px; padding: 6px 14px; min-width: 0; }
+.ef-nm i { font-style: normal; font-family: var(--display); font-weight: 700; font-size: 22px; color: var(--tv-dim); min-width: 1.8em; }
+.ef-nm b { font-family: var(--display); font-weight: 700; font-size: 28px; line-height: 1.15; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ef-page { position: absolute; right: 44px; bottom: 34px; font-size: 24px; font-weight: 700; color: var(--rose); }
 .p-empty { font-size: 44px; color: var(--tv-dim); line-height: 1.3; }
 .names { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-content: start; }
 .name { background: var(--wash); border-radius: 16px; padding: 18px 22px; border-left: 9px solid var(--c); min-width: 0; }
@@ -561,6 +573,7 @@ const SLIDE_TYPES = {
   housepoints: { label: 'House points', hint: 'Shows the house points entered on the centre screen.' },
   sotw: { label: 'Students of the week', hint: 'Shows the students entered on the centre screen.' },
   week: { label: 'Week A/B', hint: 'Shows which timetable week it is, e.g. Week B, teaching week 5. Worked out automatically from the school week plan.' },
+  effort: { label: 'Effort board', hint: 'Upload the effort board spreadsheet. Each colour gets its own page, in rank order.' },
 };
 const SLIDE_DEFAULTS = {
   list: { title: '', subtitle: '', items: '', emptyText: '' },
@@ -574,6 +587,7 @@ const SLIDE_DEFAULTS = {
   housepoints: { title: 'House points' },
   sotw: {},
   week: {},
+  effort: { rows: [], starts: {}, uploadedAt: '', file: '' },
 };
 const newSlide = type => ({ id: uid(), type, hidden: false, ...clone(SLIDE_DEFAULTS[type] || {}) });
 // Only today's Learning Legends are shown, so a "Yesterday's Learning Legends" slide is dropped from the screen and
@@ -600,6 +614,28 @@ function pagedList(s) {
   return Array.from({ length: n }, (_, k) => Object.assign({}, s, { id: s.id + '#' + (k + 1), items: all.slice(k * per, (k + 1) * per).join('\n'),
     subtitle: [s.subtitle, 'Page ' + (k + 1) + ' of ' + n].filter(Boolean).join(' · ') }));
 }
+// ---------- effort boards ----------
+// The year's effort ranking, uploaded as a spreadsheet in the side screen editor (Adam, 10 Nov 2026). Only rank and
+// "first name + surname initial" are saved. Each colour band gets its own page(s): Gold, Purple, Green, Orange, White.
+const EFFORT_BANDS = [
+  { key: 'gold', name: 'Gold', c: '#F2B705', ink: '#1A1300' }, { key: 'purple', name: 'Purple', c: '#7B2FBE', ink: '#FFFFFF' },
+  { key: 'green', name: 'Green', c: '#2E7D32', ink: '#FFFFFF' }, { key: 'orange', name: 'Orange', c: '#F57C00', ink: '#1A0E00' },
+  { key: 'white', name: 'White', c: '#F4F4F2', ink: '#111214' },
+];
+const EFFORT_PAGE = 42; // 3 columns of 14
+function effortBands(s) {
+  const rows = (s.rows || []).slice().sort((a, b) => a[0] - b[0]);
+  const starts = EFFORT_BANDS.map(b => ({ b, at: +(s.starts || {})[b.key] || 0 })).filter(x => x.at > 0).sort((a, b) => a.at - b.at);
+  if (!starts.length) return rows.length ? [{ ...EFFORT_BANDS[4], name: '', rows }] : [];
+  // Each colour runs from its start rank to the next colour's start (anyone above the first start joins the first colour).
+  return starts.map((x, i) => ({ ...x.b, rows: rows.filter(r => (i === 0 || r[0] >= x.at) && (i === starts.length - 1 || r[0] < starts[i + 1].at)) })).filter(x => x.rows.length);
+}
+function effortPages(s) {
+  return effortBands(s).flatMap(b => {
+    const n = Math.ceil(b.rows.length / EFFORT_PAGE), per = Math.ceil(b.rows.length / n); // even pages
+    return Array.from({ length: n }, (_, k) => Object.assign({}, s, { id: s.id + '#' + b.key + (k + 1), band: b, page: k + 1, pages: n, pageRows: b.rows.slice(k * per, (k + 1) * per) }));
+  });
+}
 function hasContent(s, centre) {
   switch (s.type) {
     case 'list': return !!(s.title && (lines(s.items).length || s.emptyText));
@@ -613,6 +649,7 @@ function hasContent(s, centre) {
     case 'housepoints': return Object.values(centre.housePoints || {}).some(v => +v > 0);
     case 'sotw': return centre.sotw.students.some(x => x.name);
     case 'week': return !!weekInfo(new Date());
+    case 'effort': return !!(s.rows && s.rows.length);
   }
   return false;
 }
@@ -739,6 +776,65 @@ const loadXLSX = () => xlsxLib || (xlsxLib = new Promise((ok, no) => {
   sc.onload = () => ok(window.XLSX); sc.onerror = () => { xlsxLib = null; no(new Error('The spreadsheet reader did not load. Check the connection and try again.')); };
   document.head.append(sc);
 }));
+// Effort board spreadsheet: a rank column (or row order), the pupil's name (one "Surname, First" column, or first name and
+// surname columns) and the colour, either as a column (Gold, Purple...) or as the cells' fill colour. Only rank and
+// "First S" are kept.
+function effortColourOf(t) {
+  t = String(t || '').toLowerCase();
+  return /gold|yellow/.test(t) ? 'gold' : /purple|violet/.test(t) ? 'purple' : /green/.test(t) ? 'green' : /orange|amber/.test(t) ? 'orange' : /white|none|no colour/.test(t) ? 'white' : '';
+}
+function effortColourOfFill(cell, wb) {
+  const f = cell && cell.s && (cell.s.fgColor || cell.s.bgColor); if (!f || (cell.s.patternType && cell.s.patternType === 'none')) return '';
+  let hex = f.rgb;
+  if (!hex && f.theme != null) { const cs = wb.Themes && wb.Themes.themeElements && wb.Themes.themeElements.clrScheme; hex = cs && cs[f.theme] && cs[f.theme].rgb; }
+  if (!hex) return '';
+  hex = String(hex).slice(-6); let [r, g, b] = [0, 2, 4].map(i => parseInt(hex.slice(i, i + 2), 16) / 255);
+  if (f.tint) { const t = f.tint; [r, g, b] = [r, g, b].map(v => t < 0 ? v * (1 + t) : v + (1 - v) * t); }
+  const mx = Math.max(r, g, b), mn = Math.min(r, g, b), l = (mx + mn) / 2, sat = mx === mn ? 0 : (mx - mn) / (1 - Math.abs(2 * l - 1));
+  if (sat < .25 || l > .93) return l > .6 ? 'white' : '';
+  let hue = mx === r ? 60 * (((g - b) / (mx - mn)) % 6) : mx === g ? 60 * ((b - r) / (mx - mn) + 2) : 60 * ((r - g) / (mx - mn) + 4); if (hue < 0) hue += 360;
+  return hue < 38 ? 'orange' : hue < 70 ? 'gold' : hue < 175 ? 'green' : hue >= 250 && hue < 330 ? 'purple' : '';
+}
+const shortName = (first, sur) => [String(first || '').trim(), String(sur || '').trim().charAt(0).toUpperCase()].filter(Boolean).join(' ');
+async function readEffort(file) {
+  if (/\.pdf$/i.test(file.name)) throw new Error('Please save the effort board as an Excel or CSV file first (PDFs can\'t be read).');
+  const X = await loadXLSX();
+  const wb = X.read(await file.arrayBuffer(), { type: 'array', cellStyles: true });
+  for (const sheet of wb.SheetNames) {
+    const ws = wb.Sheets[sheet]; if (!ws['!ref']) continue;
+    const rg = X.utils.decode_range(ws['!ref']);
+    const val = (r, c) => { const x = ws[X.utils.encode_cell({ r, c })]; return x ? String(x.w ?? x.v ?? '').trim() : ''; };
+    let hr = -1;
+    for (let r = rg.s.r; r <= Math.min(rg.e.r, rg.s.r + 20) && hr < 0; r++) for (let c = rg.s.c; c <= rg.e.c; c++) if (/name|rank/i.test(val(r, c))) { hr = r; break; }
+    if (hr < 0) continue;
+    const cols = {}; for (let c = rg.s.c; c <= rg.e.c; c++) cols[c] = val(hr, c);
+    const find = rx => { const k = Object.keys(cols).find(c => rx.test(cols[c])); return k == null ? -1 : +k; };
+    const cRank = find(/rank|position|^#$|^pos/i), cFirst = find(/fore|first|given|preferred/i), cSur = find(/sur|last|family/i);
+    const cName = find(/name/i), cCol = find(/colou?r|band/i);
+    if (cName < 0 && cFirst < 0) continue;
+    const rows = [];
+    for (let r = hr + 1; r <= rg.e.r; r++) {
+      let first, sur;
+      if (cFirst >= 0 && cSur >= 0) { first = val(r, cFirst); sur = val(r, cSur); }
+      else { const n = val(r, cName); if (!n) continue; if (n.includes(',')) { [sur, first] = n.split(',', 2); } else { const w = n.split(/\s+/); first = w[0]; sur = w.length > 1 ? w[w.length - 1] : ''; } }
+      if (!String(first || '').trim()) continue;
+      const rank = cRank >= 0 ? parseInt(val(r, cRank), 10) : rows.length + 1;
+      if (!(rank > 0)) continue;
+      const anchor = cRank >= 0 ? cRank : cName >= 0 ? cName : cFirst;
+      const col = cCol >= 0 ? effortColourOf(val(r, cCol)) : effortColourOfFill(ws[X.utils.encode_cell({ r, c: anchor })], wb);
+      rows.push([rank, shortName(first, sur), col]);
+    }
+    if (!rows.length) continue;
+    // Each colour starts at its best rank. Uncoloured rows after the last colour become White.
+    const starts = {};
+    for (const [rank, , col] of rows) if (col && !(starts[col] <= rank)) starts[col] = rank;
+    const others = Object.keys(starts).filter(k => k !== 'white');
+    if (others.length && !starts.white) { const last = Math.max(...others.map(k => starts[k])); const w = rows.filter(r => !r[2] && r[0] > last).map(r => r[0]); if (w.length) starts.white = Math.min(...w); }
+    if (!others.length) delete starts.white;
+    return { rows: rows.map(r => [r[0], r[1]]), starts, sheet };
+  }
+  throw new Error('No effort table was found. The sheet needs a Name column (and ideally Effort rank).');
+}
 // Every sheet that holds a table. A table's header is its first row with at least three filled cells.
 async function readBook(file) {
   const X = await loadXLSX();
@@ -1851,7 +1947,7 @@ class PortraitStage {
   pin(id) { this.pinned = id; this.idx = 0; this.slideKey = null; this.buildSlides(); }
   buildSlides() {
     let list = this.pinned ? this.data.slides.filter(s => s.id === this.pinned) : this.data.slides.filter(s => !s.hidden && hasContent(s, this.centre));
-    list = list.flatMap(pagedList).map(s => s.type === 'list' && /learning legend/i.test(s.title || '') ? Object.assign({}, s, { seconds: LEGENDS_SECONDS }) : s);
+    list = list.flatMap(s => s.type === 'effort' ? effortPages(s) : pagedList(s)).map(s => s.type === 'list' && /learning legend/i.test(s.title || '') ? Object.assign({}, s, { seconds: LEGENDS_SECONDS }) : s);
     const aw = !this.pinned && this.side === 'right' && todaysAwareness(); // awareness day posters go first, on the right-hand screen only
     if (aw) list = [{ id: '_aw', type: 'awareness', key: aw.key }, ...list];
     const usesCentre = list.some(s => s.type === 'housepoints' || s.type === 'sotw');
@@ -1874,6 +1970,14 @@ class PortraitStage {
     const head = (eyebrow, title) => [eyebrow ? h('div', { class: 's-eyebrow', text: eyebrow }) : null, title ? h('div', { class: 's-title', text: title }) : null];
     const yn = this.year.slice(1);
     switch (s.type) {
+      case 'effort': {
+        const b = s.band;
+        return h('div', { class: 'slide p-effort', style: '--c:' + b.c + ';--ink:' + b.ink },
+          h('div', { class: 'ef-band' }, h('div', { class: 'ef-star' }), h('div', {}, h('div', { class: 'ef-eb', text: 'Effort board' }), h('div', { class: 'ef-title', text: b.name ? b.name + ' Effort' : 'Effort' })),
+            h('div', { class: 'ef-count', text: b.rows.length })),
+          h('div', { class: 'ef-names' }, s.pageRows.map(r => h('div', { class: 'ef-nm' }, h('i', { text: r[0] }), h('b', { text: r[1] })))),
+          s.pages > 1 ? h('div', { class: 'ef-page', text: 'Page ' + s.page + ' of ' + s.pages }) : null);
+      }
       case 'list': {
         const ppl = lines(s.items).map(splitPerson).slice(0, 36);
         return wrap('p-list', pad(...head(s.subtitle, s.title), ppl.length
@@ -2392,6 +2496,27 @@ function viewEditSide(y, side) {
       case 'info': body.append(F('Title', 'title', 'text', {}, true), F('Text', 'body', 'textarea', { rows: 8 }, true)); break;
       case 'week': body.append(h('p', { class: 'hint wide', text: 'Worked out from the school week plan (this week: ' + (w => w ? [w.letter && 'Week ' + w.letter, weekLine(w)].filter(Boolean).join(', ') : 'no school weeks left in the plan')(weekInfo(new Date())) + '). There is nothing to edit.' })); break;
       case 'housepoints': body.append(F('Title', 'title', 'text', {}, true)); break;
+      case 'effort': {
+        const fileId = 'sl-' + s.id + '-file', out = h('p', { class: 'hw-out wide' });
+        const summary = () => { const bs = effortBands(s);
+          return s.rows && s.rows.length ? s.rows.length + ' students from ' + (s.file || 'the upload') + (s.uploadedAt ? ', uploaded ' + agoText(s.uploadedAt) : '') + '.\n' + bs.map(b => (b.name || 'All') + ' ' + b.rows[0][0] + '\u2013' + b.rows[b.rows.length - 1][0] + ' (' + b.rows.length + ')').join(' \u00b7 ')
+            : 'Nothing uploaded yet, so this slide is skipped on the TV.'; };
+        out.textContent = summary();
+        const up = h('label', { class: 'btn small', for: fileId }, s.rows && s.rows.length ? 'Upload a new effort board' : 'Upload effort board',
+          h('input', { id: fileId, type: 'file', accept: '.xlsx,.xls,.csv,.ods', hidden: true, onchange: async e => {
+            const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+            out.className = 'hw-out wide'; out.textContent = 'Reading ' + f.name + '\u2026';
+            try { const r = await readEffort(f); s.rows = r.rows; s.starts = r.starts; s.file = f.name; s.uploadedAt = new Date().toISOString(); touch(); render();
+              setStatus(Object.keys(r.starts).length ? 'Effort board read. Check the colours, then Save.' : 'Effort board read, but no colours were found. Enter where each colour starts, then Save.'); }
+            catch (err) { out.className = 'hw-out wide err'; out.textContent = err.message || String(err); }
+          } }));
+        const startsRow = h('div', { class: 'wide groups-form' }, EFFORT_BANDS.map(b => h('div', { style: '--hc:' + (b.key === 'white' ? 'var(--line)' : b.c) },
+          field(b.name + ' starts at rank', 'sl-' + s.id + '-st-' + b.key, (s.starts || {})[b.key] ?? '', v => { s.starts = s.starts || {}; if (+v > 0) s.starts[b.key] = Math.round(+v); else delete s.starts[b.key]; out.textContent = summary(); }, 'number', { min: 1, step: 1, inputmode: 'numeric' }))));
+        body.append(h('div', { class: 'wide', style: 'display:flex;gap:10px;align-items:center;flex-wrap:wrap' }, up), out,
+          s.rows && s.rows.length ? startsRow : null,
+          h('p', { class: 'note wide', text: 'Only each student\u2019s rank, first name and surname initial are saved.' }));
+        break;
+      }
     }
     const showId = 'sl-' + s.id + '-show';
     const show = h('input', { type: 'checkbox', id: showId }); show.checked = !s.hidden;
