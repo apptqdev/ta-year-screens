@@ -122,7 +122,9 @@
         if (error) return 'That login wasn\'t recognised. Check the email and password.';
         location.reload();
       },
-      async signOut() { await sb.auth.signOut(); location.reload(); },
+      // Sign out THIS browser only. Supabase's default ('global') ends every session of the account, and every TV
+      // shares the one screens account, so one "Sign out" anywhere used to sign out every TV in school (10 Nov 2026).
+      async signOut() { await sb.auth.signOut({ scope: 'local' }); location.reload(); },
       db: { doc: p => ({
         onSnapshot(fn) {
           (watchers[p] = watchers[p] || []).push(fn);
