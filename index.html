@@ -1241,8 +1241,7 @@ function viewDisplays() {
     app.replaceChildren(h('div', { class: 'wrap', style: 'max-width:900px' },
       h('div', { class: 'topbar' }, h('div', { class: 'brand' }, stripe(), h('div', {}, h('h1', { text: 'TV links' }), h('div', { class: 'tagline', text: 'screens that never need signing in' }))),
         h('div', { style: 'display:flex;gap:10px;align-items:center;flex-wrap:wrap' }, whoChip(a.me), h('a', { class: 'btn ghost', href: '#', text: 'Back' }), themeBtn())),
-      h('p', { class: 'note', style: 'margin-top:18px' }, 'Give each TV its own link and open it on that TV (set it as the start page). The TV then shows its screen without signing in, so it can\'t be signed out. A link can only show that screen; editing still needs signing in. Anyone with a link can view the screen, so keep links within school, and switch one off if it gets out.'),
-      list,
+      h('div', { style: 'margin-top:18px' }, list),
       h('div', { class: 'addrow' }, h('label', { class: 'f', for: 'tv-screen' }, 'Screen', pick), h('label', { class: 'f', for: 'tv-label', style: 'flex:1' }, 'Label', label), make, all),
       h('p', { style: 'margin-top:14px' }, status)));
     load();
