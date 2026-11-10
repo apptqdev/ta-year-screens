@@ -1239,7 +1239,7 @@ function viewDisplays() {
       all.disabled = false; load();
     } });
     app.replaceChildren(h('div', { class: 'wrap', style: 'max-width:900px' },
-      h('div', { class: 'topbar' }, h('div', { class: 'brand' }, stripe(), h('div', {}, h('h1', { text: 'TV links' }), h('div', { class: 'tagline', text: 'screens that never need signing in' }))),
+      h('div', { class: 'topbar' }, h('div', { class: 'brand' }, stripe(), h('div', {}, h('h1', { text: 'TV links' }))),
         h('div', { style: 'display:flex;gap:10px;align-items:center;flex-wrap:wrap' }, whoChip(a.me), h('a', { class: 'btn ghost', href: '#', text: 'Back' }), themeBtn())),
       h('div', { style: 'margin-top:18px' }, list),
       h('div', { class: 'addrow' }, h('label', { class: 'f', for: 'tv-screen' }, 'Screen', pick), h('label', { class: 'f', for: 'tv-label', style: 'flex:1' }, 'Label', label), make, all),
