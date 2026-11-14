@@ -235,6 +235,20 @@ table.lt th { color: var(--muted); font-size: .78rem; text-transform: uppercase;
 .takeover .ta-logo { height: 18vmin; filter: invert(1); }
 .to-text { font-family: var(--display); font-weight: 700; font-size: 13vmin; line-height: 1; letter-spacing: -.02em; max-width: 16ch; text-wrap: balance; animation: to-pulse 2s ease-in-out infinite; }
 .to-pre { font-family: var(--display); font-weight: 700; font-size: 6vmin; line-height: 1; color: #F2CF7A; margin-bottom: -1vmin; }
+.takeover.lessons { gap: 3vmin; padding: 4vmin 5vmin; }
+.takeover.lessons .ta-logo { height: 11vmin; }
+.to-lessons { width: 100%; display: flex; flex-direction: column; gap: 3vmin; }
+.tl-head { display: flex; align-items: baseline; justify-content: center; gap: 4vmin; flex-wrap: wrap; }
+.tl-title { font-family: var(--display); font-weight: 700; font-size: 11vmin; line-height: 1; letter-spacing: -.02em; }
+.tl-when { font-weight: 700; font-size: 4.4vmin; color: #F2CF7A; }
+.tl-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 2vmin; text-align: left; }
+.tl-chip { background: rgba(255,255,255,.08); border-top: 1.2vmin solid var(--c); border-radius: 1.6vmin; padding: 1.8vmin 2.2vmin; min-width: 0; }
+.tl-top { display: flex; justify-content: space-between; align-items: baseline; gap: 1vmin; }
+.tl-top b { font-family: var(--display); font-weight: 700; font-size: 6.4vmin; line-height: 1; }
+.tl-top i { font-style: normal; font-family: var(--display); font-weight: 700; font-size: 4.2vmin; color: #F2CF7A; white-space: nowrap; }
+.tl-chip span { display: block; font-size: 3.6vmin; margin-top: .8vmin; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tl-grid.many .tl-top b { font-size: 5vmin; } .tl-grid.many .tl-chip span { font-size: 3vmin; }
+.tl-none { font-size: 4vmin; color: #A3A6AD; }
 .to-sub { font-weight: 600; font-size: 2.6vmin; letter-spacing: .22em; text-transform: uppercase; color: #F2CF7A; }
 @keyframes to-in { from { opacity: 0; transform: scale(1.04); } }
 @keyframes to-pulse { 50% { transform: scale(1.04); } }
@@ -436,7 +450,11 @@ select { background: var(--bg); border: 1px solid var(--line); border-radius: 7p
 .datebar select { max-width: 100%; } .datebar input { width: auto; flex: 0 1 auto; }
 .frame { container-type: size; }
 .frame .takeover { position: absolute; z-index: 30; gap: 4cqmin; padding: 6cqmin; }
-.frame .takeover .ta-logo { height: 18cqmin; } .frame .takeover .to-text { font-size: 13cqmin; } .frame .takeover .to-pre { font-size: 6cqmin; margin-bottom: -1cqmin; } .frame .takeover .to-sub, .frame .takeover.remembrance .to-sub { font-size: 3.4cqmin; } .frame .to-poppy { width: 30cqmin; }
+.frame .takeover .ta-logo { height: 18cqmin; } .frame .takeover .to-text { font-size: 13cqmin; } .frame .takeover .to-pre { font-size: 6cqmin; margin-bottom: -1cqmin; }
+.frame .takeover.lessons { gap: 3cqmin; padding: 4cqmin 5cqmin; } .frame .takeover.lessons .ta-logo { height: 11cqmin; } .frame .to-lessons { gap: 3cqmin; }
+.frame .tl-title { font-size: 11cqmin; } .frame .tl-when { font-size: 4.4cqmin; } .frame .tl-grid { gap: 2cqmin; }
+.frame .tl-chip { border-top-width: 1.2cqmin; border-radius: 1.6cqmin; padding: 1.8cqmin 2.2cqmin; } .frame .tl-top b { font-size: 6.4cqmin; } .frame .tl-top i { font-size: 4.2cqmin; }
+.frame .tl-chip span { font-size: 3.6cqmin; margin-top: .8cqmin; } .frame .tl-grid.many .tl-top b { font-size: 5cqmin; } .frame .tl-grid.many .tl-chip span { font-size: 3cqmin; } .frame .tl-none { font-size: 4cqmin; } .frame .takeover .to-sub, .frame .takeover.remembrance .to-sub { font-size: 3.4cqmin; } .frame .to-poppy { width: 30cqmin; }
 /* awareness day posters (right-hand screens) */
 .slide.aware { color: #fff; background: radial-gradient(900px 760px at 50% 18%, var(--a2), transparent 62%), linear-gradient(165deg, var(--a1), var(--a3)); overflow: hidden; }
 .aw { height: 100%; box-sizing: border-box; padding: 56px 64px 130px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 28px; text-align: center; }
@@ -505,12 +523,38 @@ const BELLS = [
 // An entry with a `date` shows on that day only (any weekday), and `kind` gives it its own look.
 const TAKEOVERS = [
   { at: '08:15', minutes: 2, pre: 'Good morning', text: 'Go To Line Up 1' }, // 'Good morning' above it (Adam, 9 Nov 2026)
+  // The centre screen shows the coming lessons full screen at the end of each break and into the lesson, so hub
+  // teams can send late students on (Adam, 14 Nov 2026). `p` is the period shown; `centre` keeps it off the side screens.
+  { at: '11:20', minutes: 25, kind: 'lessons', p: 'P3', centre: true }, // 11:20 to 11:45: end of break 1 and the first 20 min of P3 (11:25)
+  { at: '13:30', minutes: 25, kind: 'lessons', p: 'P4', centre: true }, // 13:30 to 13:55: end of break 2 and the first 20 min of P4 (13:35)
   { date: '2026-11-11', at: '10:59', minutes: 4, text: 'Two minutes\u2019 silence', sub: 'We will remember them', kind: 'remembrance' }, // Armistice Day, 10:59 to 11:03
 ];
-function activeTakeover(now = new Date()) {
-  const wd = now.getDay(), day = effDay(now);
+function activeTakeover(now = new Date(), side = null) {
+  const day = effDay(now), wd = new Date(day + 'T12:00:00').getDay();
   const m = previewTime != null ? previewTime : now.getHours() * 60 + now.getMinutes();
-  return TAKEOVERS.find(t => (t.date ? t.date === day : wd >= 1 && wd <= 5) && m >= toMin(t.at) && m < toMin(t.at) + t.minutes) || null;
+  return TAKEOVERS.find(t => (!t.centre || !side) && (t.date ? t.date === day : wd >= 1 && wd <= 5 && (!t.kind || isSchoolDay(new Date(day + 'T12:00:00'))))
+    && m >= toMin(t.at) && m < toMin(t.at) + t.minutes) || null;
+}
+// Fill a full-screen message (the TV's, or the copy over an editor preview) for takeover t on a year's screen.
+function fillTakeover(el, t, year) {
+  const lessons = t.kind === 'lessons';
+  el.className = 'takeover' + (t.kind ? ' ' + t.kind : '');
+  $('.to-pre', el).textContent = t.pre || ''; $('.to-pre', el).hidden = !t.pre;
+  $('.to-text', el).textContent = lessons ? '' : t.text; $('.to-text', el).hidden = lessons;
+  $('.to-sub', el).textContent = t.sub || VALUES_LINE; $('.to-sub', el).hidden = lessons;
+  $('.to-poppy', el).hidden = t.kind !== 'remembrance'; $('.ta-logo', el).hidden = t.kind === 'remembrance';
+  const box = $('.to-lessons', el); box.hidden = !lessons; if (!lessons) return;
+  const b = BELLS.find(x => x.p === t.p) || BELLS[0];
+  const date = new Date(effDay(new Date()) + 'T12:00:00');
+  const rows = lessonRows(year, store.lessons[year], { p: b.p, date });
+  const now = new Date(), m = previewTime != null ? previewTime : now.getHours() * 60 + now.getMinutes();
+  const started = m >= toMin(b.start);
+  const key = b.p + started + JSON.stringify(rows); if (box._key === key) return; box._key = key;
+  box.replaceChildren(
+    h('div', { class: 'tl-head' }, h('div', { class: 'tl-title', text: b.label }), h('div', { class: 'tl-when', text: (started ? 'Started at ' : 'Starts at ') + b.start })),
+    rows.length ? h('div', { class: 'tl-grid' + (rows.length > 10 ? ' many' : '') }, rows.slice(0, 15).map(r => h('div', { class: 'tl-chip', style: '--c:' + groupColor(r.group) },
+      h('div', { class: 'tl-top' }, h('b', { text: r.group }), h('i', { text: r.room })), h('span', { text: r.subject }))))
+      : h('div', { class: 'tl-none', text: 'No lessons listed for this period.' }));
 }
 const MOTTO = 'every second counts';
 
@@ -1559,7 +1603,7 @@ function datePreviewBar(stage, frame, side, openLink, key, onDate) {
   const reset = h('button', { class: 'btn small ghost', type: 'button', text: 'Back to today' });
   // A copy of the full-screen message, sized to the preview.
   const poppy = h('div', { class: 'to-poppy', hidden: true }); poppy.innerHTML = AWARENESS_DAYS.find(a => a.key === 'armistice').art;
-  const to = h('div', { class: 'takeover', hidden: true }, logoImg(), poppy, h('div', { class: 'to-pre', hidden: true }), h('div', { class: 'to-text' }), h('div', { class: 'to-sub' }));
+  const to = h('div', { class: 'takeover', hidden: true }, logoImg(), poppy, h('div', { class: 'to-pre', hidden: true }), h('div', { class: 'to-text' }), h('div', { class: 'to-lessons', hidden: true }), h('div', { class: 'to-sub' }));
   frame.append(to);
   const apply = () => {
     previewDate = date.value || null;
@@ -1567,10 +1611,9 @@ function datePreviewBar(stage, frame, side, openLink, key, onDate) {
     const tm = /^(\d{1,2}):(\d{2})/.exec(time.value); previewTime = previewDate && tm ? +tm[1] * 60 + +tm[2] : null;
     stage.fx.off(); stage.fx.cur = null; stage.fx.check();
     stage.slideKey = null; stage.buildSlides(); stage.tick();
-    const t = previewDate ? activeTakeover() : null;
+    const t = previewDate ? activeTakeover(new Date(), side) : null;
     to.hidden = !t;
-    if (t) { $('.to-pre', to).textContent = t.pre || ''; $('.to-pre', to).hidden = !t.pre; $('.to-text', to).textContent = t.text; $('.to-sub', to).textContent = t.sub || VALUES_LINE; to.className = 'takeover' + (t.kind ? ' ' + t.kind : '');
-      poppy.hidden = t.kind !== 'remembrance'; $('.ta-logo', to).hidden = t.kind === 'remembrance'; }
+    if (t) { $('.to-lessons', to)._key = null; fillTakeover(to, t, key.split('-')[0]); }
     reset.hidden = !previewDate;
     openLink.href = '#' + key + (previewDate ? '@' + previewDate + (previewTime != null ? 'T' + time.value.slice(0, 5) : '') : '');
   };
@@ -2179,16 +2222,14 @@ function viewScreen(y, side) {
   };
   listeners.add(fill); subscribe(y); fill();
   const poppy = h('div', { class: 'to-poppy', hidden: true }); poppy.innerHTML = AWARENESS_DAYS.find(a => a.key === 'armistice').art;
-  const takeover = h('div', { class: 'takeover', hidden: true, role: 'alert' }, logoImg(), poppy, h('div', { class: 'to-pre', hidden: true }), h('div', { class: 'to-text' }), h('div', { class: 'to-sub', text: VALUES_LINE }));
+  const takeover = h('div', { class: 'takeover', hidden: true, role: 'alert' }, logoImg(), poppy, h('div', { class: 'to-pre', hidden: true }), h('div', { class: 'to-text' }), h('div', { class: 'to-lessons', hidden: true }), h('div', { class: 'to-sub', text: VALUES_LINE }));
   app.append(takeover);
   let shown = null;
   const checkTakeover = () => {
-    const t = activeTakeover();
-    if (t === shown) return; shown = t;
-    takeover.hidden = !t; if (!t) return;
-    $('.to-pre', takeover).textContent = t.pre || ''; $('.to-pre', takeover).hidden = !t.pre; $('.to-text', takeover).textContent = t.text; $('.to-sub', takeover).textContent = t.sub || VALUES_LINE;
-    takeover.className = 'takeover' + (t.kind ? ' ' + t.kind : '');
-    poppy.hidden = t.kind !== 'remembrance'; $('.ta-logo', takeover).hidden = t.kind === 'remembrance';
+    const t = activeTakeover(new Date(), side);
+    if (t === shown && !(t && t.kind === 'lessons')) return; // the lessons view refreshes (starts/started, timetable updates)
+    if (t !== shown) { shown = t; takeover.hidden = !t; }
+    if (t) fillTakeover(takeover, t, y);
   };
   checkTakeover(); const toTimer = setInterval(checkTakeover, 1000);
   let lock = null;
