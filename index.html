@@ -840,11 +840,14 @@ function effortColourOfFill(cell, wb) {
   return hue < 38 ? 'orange' : hue < 70 ? 'gold' : hue < 175 ? 'green' : hue >= 250 && hue < 330 ? 'purple' : '';
 }
 const shortName = (first, sur) => [String(first || '').trim(), String(sur || '').trim().charAt(0).toUpperCase()].filter(Boolean).join(' ');
-async function readEffort(file) {
+async function readEffort(file, year) {
   if (/\.pdf$/i.test(file.name)) throw new Error('Please save the effort board as an Excel or CSV file first (PDFs can\'t be read).');
   const X = await loadXLSX();
   const wb = X.read(await file.arrayBuffer(), { type: 'array', cellStyles: true });
-  for (const sheet of wb.SheetNames) {
+  // A file can hold several years, one sheet each ("Y7 Quarter 1", "Year 9 Quarter 1"): use this year's sheet.
+  const yn = year ? year.slice(1) : '', mine = yn ? wb.SheetNames.filter(n => new RegExp('(^|[^a-z0-9])(y|year)\\s*' + yn + '(?![0-9])', 'i').test(n)) : [];
+  if (yn && !mine.length && wb.SheetNames.some(n => /(^|[^a-z0-9])(y|year)\s*\d/i.test(n))) throw new Error('That file has no sheet for ' + yearName(year) + '. Its sheets are: ' + wb.SheetNames.join(', ') + '.');
+  for (const sheet of mine.length ? mine : wb.SheetNames) {
     const ws = wb.Sheets[sheet]; if (!ws['!ref']) continue;
     const rg = X.utils.decode_range(ws['!ref']);
     const val = (r, c) => { const x = ws[X.utils.encode_cell({ r, c })]; return x ? String(x.w ?? x.v ?? '').trim() : ''; };
@@ -2547,7 +2550,7 @@ function viewEditSide(y, side) {
           h('input', { id: fileId, type: 'file', accept: '.xlsx,.xls,.csv,.ods', hidden: true, onchange: async e => {
             const f = e.target.files[0]; e.target.value = ''; if (!f) return;
             out.className = 'hw-out wide'; out.textContent = 'Reading ' + f.name + '\u2026';
-            try { const r = await readEffort(f); s.rows = r.rows; s.starts = r.starts; s.file = f.name; s.uploadedAt = new Date().toISOString(); touch(); render();
+            try { const r = await readEffort(f, y); s.rows = r.rows; s.starts = r.starts; s.file = f.name + ' (' + r.sheet + ')'; s.uploadedAt = new Date().toISOString(); touch(); render();
               setStatus(Object.keys(r.starts).length ? 'Effort board read. Check the colours, then Save.' : 'Effort board read, but no colours were found. Enter where each colour starts, then Save.'); }
             catch (err) { out.className = 'hw-out wide err'; out.textContent = err.message || String(err); }
           } }));
