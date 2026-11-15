@@ -238,6 +238,22 @@ table.lt th { color: var(--muted); font-size: .78rem; text-transform: uppercase;
 .takeover.lessons { gap: 3vmin; padding: 4vmin 5vmin; }
 .takeover.lessons .ta-logo { height: 11vmin; }
 .to-lessons { width: 100%; display: flex; flex-direction: column; gap: 3vmin; }
+/* Effort Boards release day: every screen shows only its share of the year's effort board (Adam, 15 Nov 2026). */
+.takeover.effort { padding: 0; background: #0b0c0e; }
+.takeover.effort > .ta-logo { display: none; }
+.to-effort { position: absolute; inset: 0; overflow: hidden; text-align: left; }
+.efx { position: absolute; left: 0; top: 0; transform-origin: 0 0; background: #111214; box-sizing: border-box; padding: 32px 40px; display: flex; flex-direction: column; gap: 18px; overflow: hidden; color: #F4F4F2; }
+.efx-top { display: flex; align-items: center; gap: 22px; } .efx-top .ta-logo { height: 90px; filter: invert(1); }
+.efx-yr { font: 700 80px/1 Arial, sans-serif; letter-spacing: -.02em; } .efx-eb { margin-left: auto; font-weight: 700; font-size: 28px; letter-spacing: .14em; text-transform: uppercase; color: #F2CF7A; }
+.efx.land .efx-top .ta-logo { height: 76px; } .efx.land .efx-yr { font-size: 68px; }
+.efx-body { flex: 1; display: flex; flex-direction: column; gap: 14px; min-height: 0; }
+.efx-sec { background: #1C1E22; border-radius: 22px; overflow: hidden; display: flex; flex-direction: column; flex: none; }
+.efx-band { background: var(--c); color: var(--ink); display: flex; align-items: center; gap: 18px; padding: 12px 28px; }
+.efx-band .st { font-size: calc(var(--fs) * 1.5); line-height: 1; } .efx-band .tt { font: 700 calc(var(--fs) * 2)/1 Arial, sans-serif; letter-spacing: -.02em; } .efx-band .ct { margin-left: auto; font: 700 calc(var(--fs) * 1.8)/1 Arial, sans-serif; }
+.efx-names { display: grid; gap: calc(var(--fs) * .25); padding: calc(var(--fs) * .5) 20px; align-content: start; }
+.efx-nm { display: flex; align-items: baseline; gap: 10px; background: rgba(255,255,255,.055); border-left: 6px solid var(--c); border-radius: 9px; padding: calc(var(--fs) * .12) 12px; min-width: 0; }
+.efx-nm i { font: 700 calc(var(--fs) * .72) Arial, sans-serif; font-style: normal; color: #A3A6AD; min-width: 1.9em; }
+.efx-nm b { font: 700 var(--fs)/1.15 Arial, sans-serif; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tl-head { display: flex; align-items: baseline; justify-content: center; gap: 4vmin; flex-wrap: wrap; }
 .tl-title { font-family: var(--display); font-weight: 700; font-size: 11vmin; line-height: 1; letter-spacing: -.02em; }
 .tl-when { font-weight: 700; font-size: 4.4vmin; color: #F2CF7A; }
@@ -527,12 +543,17 @@ const TAKEOVERS = [
   // teams can send late students on (Adam, 14 Nov 2026). `p` is the period shown; `centre` keeps it off the side screens.
   { at: '11:20', minutes: 25, kind: 'lessons', p: 'P3', centre: true }, // 11:20 to 11:45: end of break 1 and the first 20 min of P3 (11:25)
   { at: '13:30', minutes: 25, kind: 'lessons', p: 'P4', centre: true }, // 13:30 to 13:55: end of break 2 and the first 20 min of P4 (13:35)
+  // Effort Boards release day: during Break 1 and lunch every screen shows only the effort board, split across the
+  // year's three TVs (EFFORT_SPLIT), until the lessons view takes over the centre at 11:20 and 13:30 (Adam, 15 Nov 2026).
+  // Break 1 starts 10:55 (end of P2) and lunch 13:05 (end of P3). Skipped for a year with no effort board uploaded.
+  { date: '2026-11-18', at: '10:55', minutes: 25, kind: 'effort' }, // 10:55 to 11:20
+  { date: '2026-11-18', at: '13:05', minutes: 25, kind: 'effort' }, // 13:05 to 13:30
   { date: '2026-11-11', at: '10:59', minutes: 4, text: 'Two minutes\u2019 silence', sub: 'We will remember them', kind: 'remembrance' }, // Armistice Day, 10:59 to 11:03
 ];
-function activeTakeover(now = new Date(), side = null) {
+function activeTakeover(now = new Date(), side = null, year = null) {
   const day = effDay(now), wd = new Date(day + 'T12:00:00').getDay();
   const m = previewTime != null ? previewTime : now.getHours() * 60 + now.getMinutes();
-  return TAKEOVERS.find(t => (!t.centre || !side) && (t.date ? t.date === day : wd >= 1 && wd <= 5 && (!t.kind || isSchoolDay(new Date(day + 'T12:00:00'))))
+  return TAKEOVERS.find(t => (!t.centre || !side) && (t.kind !== 'effort' || (year && yearEffort(year, true))) && (t.date ? t.date === day : wd >= 1 && wd <= 5 && (!t.kind || isSchoolDay(new Date(day + 'T12:00:00'))))
     && m >= toMin(t.at) && m < toMin(t.at) + t.minutes) || null;
 }
 // Fill a full-screen message (the TV's, or the copy over an editor preview) for takeover t on a year's screen.
@@ -543,6 +564,7 @@ function fillTakeover(el, t, year) {
   $('.to-text', el).textContent = lessons ? '' : t.text; $('.to-text', el).hidden = lessons;
   $('.to-sub', el).textContent = t.sub || VALUES_LINE; $('.to-sub', el).hidden = lessons;
   $('.to-poppy', el).hidden = t.kind !== 'remembrance'; $('.ta-logo', el).hidden = t.kind === 'remembrance';
+  const eb = $('.to-effort', el); eb.hidden = t.kind !== 'effort'; if (t.kind === 'effort') { $('.to-sub', el).hidden = true; fillEffortTakeover(eb, year, el.dataset.side || ''); }
   const box = $('.to-lessons', el); box.hidden = !lessons; if (!lessons) return;
   const b = BELLS.find(x => x.p === t.p) || BELLS[0];
   const date = new Date(effDay(new Date()) + 'T12:00:00');
@@ -679,6 +701,55 @@ function effortPages(s) {
     const n = Math.ceil(b.rows.length / EFFORT_PAGE), per = Math.ceil(b.rows.length / n); // even pages
     return Array.from({ length: n }, (_, k) => Object.assign({}, s, { id: s.id + '#' + b.key + (k + 1), band: b, page: k + 1, pages: n, pageRows: b.rows.slice(k * per, (k + 1) * per) }));
   });
+}
+// The year's effort board: the first Effort board slide with names on either side screen. `any` includes one whose
+// "On screen" is unticked (the release-day break screens show it anyway).
+function yearEffort(y, any) {
+  for (const side of ['right', 'left']) {
+    const d = store.screens[y + '-' + side]; const sl = d && Array.isArray(d.slides) ? d.slides : [];
+    const f = sl.find(x => x && x.type === 'effort' && x.rows && x.rows.length && (any || !x.hidden)); if (f) return f;
+  }
+  return null;
+}
+// Release day: which colours each of a year's three TVs shows (Adam, 15 Nov 2026). Year 7 has far more Gold, so Gold
+// gets the left screen to itself.
+const EFFORT_SPLIT = { y7: { left: ['gold'], centre: ['purple'], right: ['green', 'orange', 'white'] },
+  other: { left: ['gold', 'purple'], centre: ['green'], right: ['orange', 'white'] } };
+// From the day after release the effort pages join the side screens' rotation (not the centre): the left screen
+// shows Gold and Purple, the right Green, Orange and White.
+const EFFORT_ROTATION_FROM = '2026-11-19';
+const EFFORT_ROTATION = { left: ['gold', 'purple'], right: ['green', 'orange', 'white'] };
+function fillEffortTakeover(box, year, side) {
+  const s = yearEffort(year, true); const keys = (EFFORT_SPLIT[year] || EFFORT_SPLIT.other)[side || 'centre'];
+  const bands = s ? effortBands(s).filter(b => keys.includes(b.key)) : [];
+  const port = !!side, W = port ? 1080 : 1920, H = port ? 1920 : 1080;
+  const k = JSON.stringify([year, side, bands]);
+  if (box._key !== k) {
+    box._key = k;
+    const logo = logoImg();
+    box.replaceChildren(h('div', { class: 'efx ' + (port ? 'port' : 'land'), style: 'width:' + W + 'px;height:' + H + 'px' },
+      h('div', { class: 'efx-top' }, logo, h('div', { class: 'efx-yr', text: yearName(year) }), h('div', { class: 'efx-eb', text: 'Effort boards' })),
+      h('div', { class: 'efx-body' }, bands.map(b => h('div', { class: 'efx-sec', style: '--c:' + b.c + ';--ink:' + b.ink },
+        h('div', { class: 'efx-band' }, h('span', { class: 'st', text: '\u2605' }), h('div', { class: 'tt', text: b.name + ' Effort' }), h('div', { class: 'ct', text: b.rows.length })),
+        h('div', { class: 'efx-names' }, b.rows.map(r => h('div', { class: 'efx-nm', style: '--c:' + b.c }, h('i', { text: r[0] }), h('b', { text: r[1] })))))))));
+    box._fit = null;
+  }
+  const tv = box.firstChild, bw = box.clientWidth, bh = box.clientHeight; if (!tv || !bw || !bh) return;
+  const sc = Math.min(bw / W, bh / H);
+  tv.style.transform = `translate(${(bw - W * sc) / 2}px, ${(bh - H * sc) / 2}px) scale(${sc})`;
+  if (box._fit) return;
+  // Largest text that fits every name in full: try each column count and keep the biggest size.
+  const body = $('.efx-body', tv), grids = [...tv.querySelectorAll('.efx-names')], nms = [...tv.querySelectorAll('.efx-nm b')];
+  let best = { fs: 12, c: port ? 3 : 5 };
+  for (const c of port ? [3, 4] : [5, 6, 7]) {
+    grids.forEach(g => g.style.gridTemplateColumns = 'repeat(' + c + ',minmax(0,1fr))');
+    for (let fs = 44; fs >= 12; fs -= 1) {
+      tv.style.setProperty('--fs', fs + 'px');
+      if (body.scrollHeight <= body.clientHeight + 1 && !nms.some(b => b.scrollWidth > b.clientWidth)) { if (fs > best.fs) best = { fs, c }; break; }
+    }
+  }
+  grids.forEach(g => g.style.gridTemplateColumns = 'repeat(' + best.c + ',minmax(0,1fr))'); tv.style.setProperty('--fs', best.fs + 'px');
+  box._fit = true;
 }
 function hasContent(s, centre) {
   switch (s.type) {
@@ -1597,7 +1668,7 @@ function datePreviewBar(stage, frame, side, openLink, key, onDate) {
   const EFFECT_NAMES = { fireworks: 'Fireworks Night', snow: 'Snow (last week before Christmas)', remembrance: 'Armistice Day (grey screens and poppy)' };
   const special = [
     ...EFFECTS.map(e => ({ label: EFFECT_NAMES[e.key] || e.key, date: e.from })),
-    ...TAKEOVERS.filter(t => t.date).map(t => ({ label: t.text.replace('’', "'") + ' (' + t.at + ')', date: t.date, time: t.at })),
+    ...TAKEOVERS.filter(t => t.date).map(t => ({ label: (t.kind === 'effort' ? 'Effort Boards release (break screens)' : t.text.replace('’', "'")) + ' (' + t.at + ')', date: t.date, time: t.at })),
     ...(side === 'right' ? AWARENESS_DAYS.map(a => ({ label: a.title + (a.eyebrow ? ' (' + a.eyebrow.replace(' · ', ', ') + ')' : '') + ' poster', date: a.only ? a.date : awarenessShowDay(a.date) })) : []),
   ].sort((a, b) => (a.date + (a.time || '')).localeCompare(b.date + (b.time || '')));
   const pick = h('select', { 'aria-label': 'Special days' }, h('option', { value: '', text: 'Special days…' }),
@@ -1606,17 +1677,17 @@ function datePreviewBar(stage, frame, side, openLink, key, onDate) {
   const reset = h('button', { class: 'btn small ghost', type: 'button', text: 'Back to today' });
   // A copy of the full-screen message, sized to the preview.
   const poppy = h('div', { class: 'to-poppy', hidden: true }); poppy.innerHTML = AWARENESS_DAYS.find(a => a.key === 'armistice').art;
-  const to = h('div', { class: 'takeover', hidden: true }, logoImg(), poppy, h('div', { class: 'to-pre', hidden: true }), h('div', { class: 'to-text' }), h('div', { class: 'to-lessons', hidden: true }), h('div', { class: 'to-sub' }));
-  frame.append(to);
+  const to = h('div', { class: 'takeover', hidden: true }, logoImg(), poppy, h('div', { class: 'to-pre', hidden: true }), h('div', { class: 'to-text' }), h('div', { class: 'to-lessons', hidden: true }), h('div', { class: 'to-effort', hidden: true }), h('div', { class: 'to-sub' }));
+  to.dataset.side = side || ''; frame.append(to);
   const apply = () => {
     previewDate = date.value || null;
     if (previewDate && onDate) onDate(); // play the whole day, not just the selected slide, so that day's poster shows (Adam, 10 Nov 2026)
     const tm = /^(\d{1,2}):(\d{2})/.exec(time.value); previewTime = previewDate && tm ? +tm[1] * 60 + +tm[2] : null;
     stage.fx.off(); stage.fx.cur = null; stage.fx.check();
     stage.slideKey = null; stage.buildSlides(); stage.tick();
-    const t = previewDate ? activeTakeover(new Date(), side) : null;
+    const t = previewDate ? activeTakeover(new Date(), side, key.split('-')[0]) : null;
     to.hidden = !t;
-    if (t) { $('.to-lessons', to)._key = null; fillTakeover(to, t, key.split('-')[0]); }
+    if (t) { $('.to-lessons', to)._key = null; $('.to-effort', to)._key = null; fillTakeover(to, t, key.split('-')[0]); }
     reset.hidden = !previewDate;
     openLink.href = '#' + key + (previewDate ? '@' + previewDate + (previewTime != null ? 'T' + time.value.slice(0, 5) : '') : '');
   };
@@ -2005,8 +2076,12 @@ class PortraitStage {
   }
   pin(id) { this.pinned = id; this.idx = 0; this.slideKey = null; this.buildSlides(); }
   buildSlides() {
-    let list = this.pinned ? this.data.slides.filter(s => s.id === this.pinned) : this.data.slides.filter(s => !s.hidden && hasContent(s, this.centre));
-    list = list.flatMap(s => s.type === 'effort' ? effortPages(s) : pagedList(s)).map(s => s.type === 'list' && /learning legend/i.test(s.title || '') ? Object.assign({}, s, { seconds: LEGENDS_SECONDS }) : s);
+    let list = this.pinned ? this.data.slides.filter(s => s.id === this.pinned) : this.data.slides.filter(s => !s.hidden && hasContent(s, this.centre) && s.type !== 'effort');
+    if (!this.pinned && effDay() >= EFFORT_ROTATION_FROM) { // the year's effort pages, this side's colours only
+      const ef = yearEffort(this.year), keys = EFFORT_ROTATION[this.side] || [];
+      if (ef && keys.length) list.push(Object.assign({}, ef, { id: ef.id + '@' + this.side, starts: ef.starts, _only: keys }));
+    }
+    list = list.flatMap(s => s.type === 'effort' ? effortPages(s).filter(p => !s._only || s._only.includes(p.band.key)) : pagedList(s)).map(s => s.type === 'list' && /learning legend/i.test(s.title || '') ? Object.assign({}, s, { seconds: LEGENDS_SECONDS }) : s);
     const aw = !this.pinned && this.side === 'right' && todaysAwareness(); // awareness day posters go first, on the right-hand screen only
     if (aw) list = [{ id: '_aw', type: 'awareness', key: aw.key }, ...list];
     const usesCentre = list.some(s => s.type === 'housepoints' || s.type === 'sotw');
@@ -2238,12 +2313,12 @@ function viewScreen(y, side) {
   };
   listeners.add(fill); subscribe(y); fill();
   const poppy = h('div', { class: 'to-poppy', hidden: true }); poppy.innerHTML = AWARENESS_DAYS.find(a => a.key === 'armistice').art;
-  const takeover = h('div', { class: 'takeover', hidden: true, role: 'alert' }, logoImg(), poppy, h('div', { class: 'to-pre', hidden: true }), h('div', { class: 'to-text' }), h('div', { class: 'to-lessons', hidden: true }), h('div', { class: 'to-sub', text: VALUES_LINE }));
-  app.append(takeover);
+  const takeover = h('div', { class: 'takeover', hidden: true, role: 'alert' }, logoImg(), poppy, h('div', { class: 'to-pre', hidden: true }), h('div', { class: 'to-text' }), h('div', { class: 'to-lessons', hidden: true }), h('div', { class: 'to-effort', hidden: true }), h('div', { class: 'to-sub', text: VALUES_LINE }));
+  takeover.dataset.side = side || ''; app.append(takeover);
   let shown = null;
   const checkTakeover = () => {
-    const t = activeTakeover(new Date(), side);
-    if (t === shown && !(t && t.kind === 'lessons')) return; // the lessons view refreshes (starts/started, timetable updates)
+    const t = activeTakeover(new Date(), side, y);
+    if (t === shown && !(t && (t.kind === 'lessons' || t.kind === 'effort'))) return; // the lessons view refreshes (starts/started, timetable updates)
     if (t !== shown) { shown = t; takeover.hidden = !t; }
     if (t) fillTakeover(takeover, t, y);
   };
