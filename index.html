@@ -250,10 +250,11 @@ table.lt th { color: var(--muted); font-size: .78rem; text-transform: uppercase;
 .efx-sec { background: #1C1E22; border-radius: 22px; overflow: hidden; display: flex; flex-direction: column; flex: none; }
 .efx-band { background: var(--c); color: var(--ink); display: flex; align-items: center; gap: 18px; padding: 12px 28px; }
 .efx-band .st { font-size: calc(var(--fs) * 1.5); line-height: 1; } .efx-band .tt { font: 700 calc(var(--fs) * 2)/1 Arial, sans-serif; letter-spacing: -.02em; } .efx-band .ct { margin-left: auto; font: 700 calc(var(--fs) * 1.8)/1 Arial, sans-serif; }
-.efx-names { display: grid; gap: calc(var(--fs) * .25); padding: calc(var(--fs) * .5) 20px; align-content: start; }
+.efx-names { display: grid; grid-auto-flow: column; gap: calc(var(--fs) * .25); padding: calc(var(--fs) * .5) 20px; align-content: start; }
 .efx-nm { display: flex; align-items: baseline; gap: 10px; background: rgba(255,255,255,.055); border-left: 6px solid var(--c); border-radius: 9px; padding: calc(var(--fs) * .12) 12px; min-width: 0; }
 .efx-nm i { font: 700 calc(var(--fs) * .72) Arial, sans-serif; font-style: normal; color: #A3A6AD; min-width: 1.9em; }
-.efx-nm b { font: 700 var(--fs)/1.15 Arial, sans-serif; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.efx-nm b { flex: 1; min-width: 0; font: 700 var(--fs)/1.15 Arial, sans-serif; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.efx-nm em { flex: none; font: 700 calc(var(--fs) * .72) Arial, sans-serif; font-style: normal; color: #F2CF7A; }
 .tl-head { display: flex; align-items: baseline; justify-content: center; gap: 4vmin; flex-wrap: wrap; }
 .tl-title { font-family: var(--display); font-weight: 700; font-size: 11vmin; line-height: 1; letter-spacing: -.02em; }
 .tl-when { font-weight: 700; font-size: 4.4vmin; color: #F2CF7A; }
@@ -302,10 +303,11 @@ table.lt th { color: var(--muted); font-size: .78rem; text-transform: uppercase;
 .ef-eb { font-size: 28px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; opacity: .85; }
 .ef-title { font-family: var(--display); font-weight: 700; font-size: 92px; line-height: 1; letter-spacing: -.02em; margin-top: 6px; white-space: nowrap; }
 .ef-count { margin-left: auto; font-family: var(--display); font-weight: 700; font-size: 84px; line-height: 1; }
-.ef-names { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; padding: 22px 32px; align-content: start; }
+.ef-names { display: grid; grid-auto-flow: column; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; padding: 22px 32px; align-content: start; }
 .ef-nm { display: flex; align-items: baseline; gap: 12px; background: var(--wash); border-left: 8px solid var(--c); border-radius: 10px; padding: 6px 14px; min-width: 0; }
 .ef-nm i { font-style: normal; font-family: var(--display); font-weight: 700; font-size: 22px; color: var(--tv-dim); min-width: 1.8em; }
-.ef-nm b { font-family: var(--display); font-weight: 700; font-size: 28px; line-height: 1.15; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ef-nm b { flex: 1; min-width: 0; font-family: var(--display); font-weight: 700; font-size: 28px; line-height: 1.15; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ef-nm em { flex: none; font-style: normal; font-family: var(--display); font-weight: 700; font-size: 20px; color: var(--tv-dim); }
 .ef-page { position: absolute; right: 44px; bottom: 34px; font-size: 24px; font-weight: 700; color: var(--rose); }
 .p-empty { font-size: 44px; color: var(--tv-dim); line-height: 1.3; }
 .names { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-content: start; }
@@ -719,6 +721,8 @@ const EFFORT_SPLIT = { y7: { left: ['gold'], centre: ['purple'], right: ['green'
 // shows Gold and Purple, the right Green, Orange and White.
 const EFFORT_ROTATION_FROM = '2026-11-19';
 const EFFORT_ROTATION = { left: ['gold', 'purple'], right: ['green', 'orange', 'white'] };
+// The pupil's effort score (1.00 is best) beside their name, when the upload had an Average effort column (Adam, 15 Nov 2026).
+const effortScore = r => r[2] != null && isFinite(r[2]) ? h('em', { text: (+r[2]).toFixed(2) }) : null;
 function fillEffortTakeover(box, year, side) {
   const s = yearEffort(year, true); const keys = (EFFORT_SPLIT[year] || EFFORT_SPLIT.other)[side || 'centre'];
   const bands = s ? effortBands(s).filter(b => keys.includes(b.key)) : [];
@@ -731,7 +735,7 @@ function fillEffortTakeover(box, year, side) {
       h('div', { class: 'efx-top' }, logo, h('div', { class: 'efx-yr', text: yearName(year) }), h('div', { class: 'efx-eb', text: 'Effort boards' })),
       h('div', { class: 'efx-body' }, bands.map(b => h('div', { class: 'efx-sec', style: '--c:' + b.c + ';--ink:' + b.ink },
         h('div', { class: 'efx-band' }, h('span', { class: 'st', text: '\u2605' }), h('div', { class: 'tt', text: b.name + ' Effort' }), h('div', { class: 'ct', text: b.rows.length })),
-        h('div', { class: 'efx-names' }, b.rows.map(r => h('div', { class: 'efx-nm', style: '--c:' + b.c }, h('i', { text: r[0] }), h('b', { text: r[1] })))))))));
+        h('div', { class: 'efx-names' }, b.rows.map(r => h('div', { class: 'efx-nm', style: '--c:' + b.c }, h('i', { text: r[0] }), h('b', { text: r[1] }), effortScore(r)))))))));
     box._fit = null;
   }
   const tv = box.firstChild, bw = box.clientWidth, bh = box.clientHeight; if (!tv || !bw || !bh) return;
@@ -742,13 +746,13 @@ function fillEffortTakeover(box, year, side) {
   const body = $('.efx-body', tv), grids = [...tv.querySelectorAll('.efx-names')], nms = [...tv.querySelectorAll('.efx-nm b')];
   let best = { fs: 12, c: port ? 3 : 5 };
   for (const c of port ? [3, 4] : [5, 6, 7]) {
-    grids.forEach(g => g.style.gridTemplateColumns = 'repeat(' + c + ',minmax(0,1fr))');
+    grids.forEach(g => { g.style.gridTemplateColumns = 'repeat(' + c + ',minmax(0,1fr))'; g.style.gridTemplateRows = 'repeat(' + Math.ceil(g.children.length / c) + ',auto)'; });
     for (let fs = 44; fs >= 12; fs -= 1) {
       tv.style.setProperty('--fs', fs + 'px');
       if (body.scrollHeight <= body.clientHeight + 1 && !nms.some(b => b.scrollWidth > b.clientWidth)) { if (fs > best.fs) best = { fs, c }; break; }
     }
   }
-  grids.forEach(g => g.style.gridTemplateColumns = 'repeat(' + best.c + ',minmax(0,1fr))'); tv.style.setProperty('--fs', best.fs + 'px');
+  grids.forEach(g => { g.style.gridTemplateColumns = 'repeat(' + best.c + ',minmax(0,1fr))'; g.style.gridTemplateRows = 'repeat(' + Math.ceil(g.children.length / best.c) + ',auto)'; }); tv.style.setProperty('--fs', best.fs + 'px');
   box._fit = true;
 }
 function hasContent(s, centre) {
@@ -928,7 +932,7 @@ async function readEffort(file, year) {
     const cols = {}; for (let c = rg.s.c; c <= rg.e.c; c++) cols[c] = val(hr, c);
     const find = rx => { const k = Object.keys(cols).find(c => rx.test(cols[c])); return k == null ? -1 : +k; };
     const cRank = find(/rank|position|^#$|^pos/i), cFirst = find(/fore|first|given|preferred/i), cSur = find(/sur|last|family/i);
-    const cName = find(/name/i), cCol = find(/colou?r|band/i);
+    const cName = find(/name/i), cCol = find(/colou?r|band/i), cScore = find(/^\s*(average effort|effort score|score)\s*$/i);
     if (cName < 0 && cFirst < 0) continue;
     const rows = [];
     for (let r = hr + 1; r <= rg.e.r; r++) {
@@ -940,7 +944,8 @@ async function readEffort(file, year) {
       if (!(rank > 0)) continue;
       const anchor = cRank >= 0 ? cRank : cName >= 0 ? cName : cFirst;
       const col = cCol >= 0 ? effortColourOf(val(r, cCol)) : effortColourOfFill(ws[X.utils.encode_cell({ r, c: anchor })], wb);
-      rows.push([rank, shortName(first, sur), col]);
+      const sc = cScore >= 0 ? parseFloat(val(r, cScore)) : NaN;
+      rows.push([rank, shortName(first, sur), col, isFinite(sc) ? Math.round(sc * 100) / 100 : null]);
     }
     if (!rows.length) continue;
     // Each colour starts at its best rank. Uncoloured rows after the last colour become White.
@@ -949,7 +954,7 @@ async function readEffort(file, year) {
     const others = Object.keys(starts).filter(k => k !== 'white');
     if (others.length && !starts.white) { const last = Math.max(...others.map(k => starts[k])); const w = rows.filter(r => !r[2] && r[0] > last).map(r => r[0]); if (w.length) starts.white = Math.min(...w); }
     if (!others.length) delete starts.white;
-    return { rows: rows.map(r => [r[0], r[1]]), starts, sheet };
+    return { rows: rows.map(r => r[3] != null ? [r[0], r[1], r[3]] : [r[0], r[1]]), starts, sheet }; // [rank, 'First S', effort score]
   }
   throw new Error('No effort table was found. The sheet needs a Name column (and ideally Effort rank).');
 }
@@ -2109,7 +2114,7 @@ class PortraitStage {
         return h('div', { class: 'slide p-effort', style: '--c:' + b.c + ';--ink:' + b.ink },
           h('div', { class: 'ef-band' }, h('div', { class: 'ef-star' }), h('div', {}, h('div', { class: 'ef-eb', text: 'Effort board' }), h('div', { class: 'ef-title', text: b.name ? b.name + ' Effort' : 'Effort' })),
             h('div', { class: 'ef-count', text: b.rows.length })),
-          h('div', { class: 'ef-names' }, s.pageRows.map(r => h('div', { class: 'ef-nm' }, h('i', { text: r[0] }), h('b', { text: r[1] })))),
+          h('div', { class: 'ef-names', style: 'grid-template-rows:repeat(' + Math.ceil(s.pageRows.length / 3) + ',auto)' }, s.pageRows.map(r => h('div', { class: 'ef-nm' }, h('i', { text: r[0] }), h('b', { text: r[1] }), effortScore(r)))),
           s.pages > 1 ? h('div', { class: 'ef-page', text: 'Page ' + s.page + ' of ' + s.pages }) : null);
       }
       case 'list': {
