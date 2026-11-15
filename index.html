@@ -1598,7 +1598,7 @@ function datePreviewBar(stage, frame, side, openLink, key, onDate) {
   const special = [
     ...EFFECTS.map(e => ({ label: EFFECT_NAMES[e.key] || e.key, date: e.from })),
     ...TAKEOVERS.filter(t => t.date).map(t => ({ label: t.text.replace('’', "'") + ' (' + t.at + ')', date: t.date, time: t.at })),
-    ...(side === 'right' ? AWARENESS_DAYS.map(a => ({ label: a.title + ' poster', date: awarenessShowDay(a.date) })) : []),
+    ...(side === 'right' ? AWARENESS_DAYS.map(a => ({ label: a.title + (a.eyebrow ? ' (' + a.eyebrow.replace(' · ', ', ') + ')' : '') + ' poster', date: a.only ? a.date : awarenessShowDay(a.date) })) : []),
   ].sort((a, b) => (a.date + (a.time || '')).localeCompare(b.date + (b.time || '')));
   const pick = h('select', { 'aria-label': 'Special days' }, h('option', { value: '', text: 'Special days…' }),
     special.map((s, i) => h('option', { value: i, text: fmtDate(s.date, { day: 'numeric', month: 'short' }) + ' · ' + s.label })));
@@ -1669,6 +1669,19 @@ const AWARENESS_DAYS = [
       <circle cx="200" cy="200" r="142" fill="#2E86DE"/><g clip-path="url(#awGlobe)"><g class="aw-land" fill="#5CCB6F">${awLand}<g transform="translate(400 0)">${awLand}</g></g>
       <path d="M200 58a142 142 0 0 1 0 284a110 142 0 0 0 0-284z" fill="#000" opacity=".16"/></g>
       <circle cx="200" cy="200" r="142" fill="none" stroke="#fff" stroke-opacity=".5" stroke-width="4"/></svg>` },
+  // Effort Boards teasers before the release on Wednesday 18 November 2026 at Break 1 (Adam, 15 Nov 2026). Shown on the date only.
+  { key: 'effort-teaser-1', date: '2026-11-16', only: true, eyebrow: 'Coming Wednesday · Break 1', title: 'Effort Boards', line: 'Where will you rank? Find out this Wednesday at Break\u00a01.',
+    tag: 'Every second counts.', colors: ['#20265E', '#3D47B8', '#0E1130', '#FBBC04'], art: `<svg viewBox="0 0 400 400"><circle class="aw-pulse" cx="200" cy="200" r="170" fill="#fff" opacity=".06"/>
+      <g class="aw-bob"><rect x="62" y="150" width="50" height="190" rx="10" fill="#FBBC04"/><rect x="122" y="196" width="50" height="144" rx="10" fill="#9B30E0"/><rect x="182" y="232" width="50" height="108" rx="10" fill="#3E9B2A"/>
+      <rect x="242" y="262" width="50" height="78" rx="10" fill="#FF6D01"/><rect x="302" y="288" width="50" height="52" rx="10" fill="#F4F4F2"/><rect x="48" y="340" width="318" height="10" rx="5" fill="#fff" opacity=".5"/>
+      <text x="87" y="196" text-anchor="middle" font-family="Arial,sans-serif" font-weight="700" font-size="34" fill="#4A3500">1</text></g>
+      <g class="aw-twinkle">${awStar(87, 92, 34, '#FBBC04')}</g><g class="aw-twinkle d2">${awStar(300, 100, 20, '#fff')}</g><g class="aw-twinkle d3">${awStar(350, 200, 16, '#FBBC04')}</g></svg>` },
+  { key: 'effort-teaser-2', date: '2026-11-17', only: true, eyebrow: 'Coming tomorrow!', title: 'Effort Boards', line: 'Find your name on the screens tomorrow at Break\u00a01. Where will you rank?',
+    tag: 'Every second counts.', colors: ['#20265E', '#3D47B8', '#0E1130', '#FBBC04'], art: `<svg viewBox="0 0 400 400"><circle class="aw-pulse" cx="200" cy="200" r="170" fill="#fff" opacity=".06"/>
+      <g class="aw-bob"><rect x="62" y="150" width="50" height="190" rx="10" fill="#FBBC04"/><rect x="122" y="196" width="50" height="144" rx="10" fill="#9B30E0"/><rect x="182" y="232" width="50" height="108" rx="10" fill="#3E9B2A"/>
+      <rect x="242" y="262" width="50" height="78" rx="10" fill="#FF6D01"/><rect x="302" y="288" width="50" height="52" rx="10" fill="#F4F4F2"/><rect x="48" y="340" width="318" height="10" rx="5" fill="#fff" opacity=".5"/>
+      <text x="87" y="196" text-anchor="middle" font-family="Arial,sans-serif" font-weight="700" font-size="34" fill="#4A3500">1</text></g>
+      <g class="aw-twinkle">${awStar(87, 92, 34, '#FBBC04')}</g><g class="aw-twinkle d2">${awStar(300, 100, 20, '#fff')}</g><g class="aw-twinkle d3">${awStar(350, 200, 16, '#FBBC04')}</g></svg>` },
 ];
 // The school day a poster shows on: the day itself, or the school day before when it falls on a weekend or holiday.
 function awarenessShowDay(iso) {
@@ -1676,7 +1689,7 @@ function awarenessShowDay(iso) {
   for (let k = 1; k <= 3; k++) { const p = new Date(d); p.setDate(d.getDate() - k); if (isSchoolDay(p)) return isoDay(p); }
   return iso;
 }
-const todaysAwareness = (now = new Date()) => { const t = effDay(now); return AWARENESS_DAYS.find(a => a.date === t || awarenessShowDay(a.date) === t) || null; };
+const todaysAwareness = (now = new Date()) => { const t = effDay(now); return AWARENESS_DAYS.find(a => a.date === t || (!a.only && awarenessShowDay(a.date) === t)) || null; };
 function awarenessEl(key) {
   const a = AWARENESS_DAYS.find(x => x.key === key);
   const days = Math.round((new Date(a.date + 'T12:00:00') - new Date(effDay() + 'T12:00:00')) / 864e5);
@@ -1685,7 +1698,7 @@ function awarenessEl(key) {
   const [c1, c2, c3, c4] = a.colors;
   return h('div', { class: 'slide aware aw-' + a.key + (a.calm ? ' calm' : ''), style: `--a1:${c1};--a2:${c2};--a3:${c3};--a4:${c4}` },
     h('div', { class: 'aw' }, art, h('div', { class: 'aw-text' },
-      h('div', { class: 'aw-eyebrow', text: when + ' · ' + fmtDate(a.date, { weekday: 'long', day: 'numeric', month: 'long' }) }),
+      h('div', { class: 'aw-eyebrow', text: a.eyebrow || when + ' · ' + fmtDate(a.date, { weekday: 'long', day: 'numeric', month: 'long' }) }),
       h('div', { class: 'aw-title', text: a.title }), h('div', { class: 'aw-line', text: a.line }), h('div', { class: 'aw-tag', text: a.tag }))));
 }
 // Value of the week posters, in the style of the awareness-day posters: one design per value (Adam, 8 Oct 2026).
