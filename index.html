@@ -303,7 +303,7 @@ table.lt th { color: var(--muted); font-size: .78rem; text-transform: uppercase;
 .ef-eb { font-size: 28px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; opacity: .85; }
 .ef-title { font-family: var(--display); font-weight: 700; font-size: 92px; line-height: 1; letter-spacing: -.02em; margin-top: 6px; white-space: nowrap; }
 .ef-count { margin-left: auto; font-family: var(--display); font-weight: 700; font-size: 84px; line-height: 1; }
-.ef-names { display: grid; grid-auto-flow: column; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; padding: 22px 32px; align-content: start; }
+.ef-names { display: grid; grid-auto-flow: column; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; padding: 22px 32px; align-content: start; }
 .ef-nm { display: flex; align-items: baseline; gap: 12px; background: var(--wash); border-left: 8px solid var(--c); border-radius: 10px; padding: 6px 14px; min-width: 0; }
 .ef-nm i { font-style: normal; font-family: var(--display); font-weight: 700; font-size: 22px; color: var(--tv-dim); min-width: 1.8em; }
 .ef-nm b { flex: 1; min-width: 0; font-family: var(--display); font-weight: 700; font-size: 28px; line-height: 1.15; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -690,7 +690,7 @@ const EFFORT_BANDS = [
   { key: 'green', name: 'Green', c: '#2E7D32', ink: '#FFFFFF' }, { key: 'orange', name: 'Orange', c: '#F57C00', ink: '#1A0E00' },
   { key: 'white', name: 'White', c: '#F4F4F2', ink: '#111214' },
 ];
-const EFFORT_PAGE = 42; // 3 columns of 14
+const EFFORT_PAGE = 30; // 2 columns of 15, wide enough for full names (Adam, 16 Nov 2026)
 function effortBands(s) {
   const rows = (s.rows || []).slice().sort((a, b) => a[0] - b[0]);
   const starts = EFFORT_BANDS.map(b => ({ b, at: +(s.starts || {})[b.key] || 0 })).filter(x => x.at > 0).sort((a, b) => a.at - b.at);
@@ -745,12 +745,12 @@ function fillEffortTakeover(box, year, side) {
   // Largest text that fits every name in full: try each column count and keep the biggest size.
   const body = $('.efx-body', tv), grids = [...tv.querySelectorAll('.efx-names')], nms = [...tv.querySelectorAll('.efx-nm b')];
   let best = { fs: 12, c: port ? 3 : 5 };
-  for (const c of port ? [3, 4] : [5, 6, 7]) {
+  for (const c of port ? [2, 3, 4] : [3, 4, 5, 6, 7]) {
     grids.forEach(g => { g.style.gridTemplateColumns = 'repeat(' + c + ',minmax(0,1fr))'; g.style.gridTemplateRows = 'repeat(' + Math.ceil(g.children.length / c) + ',auto)'; });
     for (let fs = 44; fs >= 12; fs -= 1) {
       tv.style.setProperty('--fs', fs + 'px');
-      // a long name (a clash shown with its full surname) may shrink on its own to 70%, rather than shrinking every name
-      if (body.scrollHeight <= body.clientHeight + 1 && !nms.some(b => b.scrollWidth * .7 > b.clientWidth)) { if (fs > best.fs) best = { fs, c }; break; }
+      // a very long name (double-barrelled) may shrink on its own to 60%, rather than shrinking every name
+      if (body.scrollHeight <= body.clientHeight + 1 && !nms.some(b => b.scrollWidth * .6 > b.clientWidth)) { if (fs > best.fs) best = { fs, c }; break; }
     }
   }
   grids.forEach(g => { g.style.gridTemplateColumns = 'repeat(' + best.c + ',minmax(0,1fr))'; g.style.gridTemplateRows = 'repeat(' + Math.ceil(g.children.length / best.c) + ',auto)'; }); tv.style.setProperty('--fs', best.fs + 'px');
@@ -950,8 +950,8 @@ async function readEffort(file, year) {
       rows.push([rank, shortName(first, sur), col, isFinite(sc) ? Math.round(sc * 100) / 100 : null, String(first).trim() + ' ' + String(sur || '').trim()]);
     }
     if (!rows.length) continue;
-    // Two pupils who would both show as "Oliver B" get their full surnames instead (Adam, 16 Nov 2026).
-    const seen = {}; rows.forEach(r => { seen[r[1]] = (seen[r[1]] || 0) + 1; }); rows.forEach(r => { if (seen[r[1]] > 1 && r[4].trim()) r[1] = r[4].trim(); });
+    // Every pupil shows their full surname, as some share a first name and initial (Adam, 16 Nov 2026).
+    rows.forEach(r => { if (r[4].trim()) r[1] = r[4].trim(); });
     // Each colour starts at its best rank. Uncoloured rows after the last colour become White.
     const starts = {};
     for (const [rank, , col] of rows) if (col && !(starts[col] <= rank)) starts[col] = rank;
@@ -2118,7 +2118,7 @@ class PortraitStage {
         return h('div', { class: 'slide p-effort', style: '--c:' + b.c + ';--ink:' + b.ink },
           h('div', { class: 'ef-band' }, h('div', { class: 'ef-star' }), h('div', {}, h('div', { class: 'ef-eb', text: 'Effort board' }), h('div', { class: 'ef-title', text: b.name ? b.name + ' Effort' : 'Effort' })),
             h('div', { class: 'ef-count', text: b.rows.length })),
-          h('div', { class: 'ef-names', style: 'grid-template-rows:repeat(' + Math.ceil(s.pageRows.length / 3) + ',auto)' }, s.pageRows.map(r => h('div', { class: 'ef-nm' }, h('i', { text: r[0] }), h('b', { text: r[1], style: String(r[1]).length > 12 ? 'font-size:' + Math.max(19, Math.round(28 * 12 / String(r[1]).length)) + 'px' : null }), effortScore(r)))),
+          h('div', { class: 'ef-names', style: 'grid-template-rows:repeat(' + Math.ceil(s.pageRows.length / 2) + ',auto)' }, s.pageRows.map(r => h('div', { class: 'ef-nm' }, h('i', { text: r[0] }), h('b', { text: r[1], style: String(r[1]).length > 20 ? 'font-size:' + Math.max(16, Math.round(28 * 20 / String(r[1]).length)) + 'px' : null }), effortScore(r)))),
           s.pages > 1 ? h('div', { class: 'ef-page', text: 'Page ' + s.page + ' of ' + s.pages }) : null);
       }
       case 'list': {
