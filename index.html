@@ -749,10 +749,12 @@ function fillEffortTakeover(box, year, side) {
     grids.forEach(g => { g.style.gridTemplateColumns = 'repeat(' + c + ',minmax(0,1fr))'; g.style.gridTemplateRows = 'repeat(' + Math.ceil(g.children.length / c) + ',auto)'; });
     for (let fs = 44; fs >= 12; fs -= 1) {
       tv.style.setProperty('--fs', fs + 'px');
-      if (body.scrollHeight <= body.clientHeight + 1 && !nms.some(b => b.scrollWidth > b.clientWidth)) { if (fs > best.fs) best = { fs, c }; break; }
+      // a long name (a clash shown with its full surname) may shrink on its own to 70%, rather than shrinking every name
+      if (body.scrollHeight <= body.clientHeight + 1 && !nms.some(b => b.scrollWidth * .7 > b.clientWidth)) { if (fs > best.fs) best = { fs, c }; break; }
     }
   }
   grids.forEach(g => { g.style.gridTemplateColumns = 'repeat(' + best.c + ',minmax(0,1fr))'; g.style.gridTemplateRows = 'repeat(' + Math.ceil(g.children.length / best.c) + ',auto)'; }); tv.style.setProperty('--fs', best.fs + 'px');
+  nms.forEach(b => { if (b.scrollWidth > b.clientWidth) b.style.fontSize = (best.fs * b.clientWidth / b.scrollWidth * .97).toFixed(1) + 'px'; });
   box._fit = true;
 }
 function hasContent(s, centre) {
@@ -945,9 +947,11 @@ async function readEffort(file, year) {
       const anchor = cRank >= 0 ? cRank : cName >= 0 ? cName : cFirst;
       const col = cCol >= 0 ? effortColourOf(val(r, cCol)) : effortColourOfFill(ws[X.utils.encode_cell({ r, c: anchor })], wb);
       const sc = cScore >= 0 ? parseFloat(val(r, cScore)) : NaN;
-      rows.push([rank, shortName(first, sur), col, isFinite(sc) ? Math.round(sc * 100) / 100 : null]);
+      rows.push([rank, shortName(first, sur), col, isFinite(sc) ? Math.round(sc * 100) / 100 : null, String(first).trim() + ' ' + String(sur || '').trim()]);
     }
     if (!rows.length) continue;
+    // Two pupils who would both show as "Oliver B" get their full surnames instead (Adam, 16 Nov 2026).
+    const seen = {}; rows.forEach(r => { seen[r[1]] = (seen[r[1]] || 0) + 1; }); rows.forEach(r => { if (seen[r[1]] > 1 && r[4].trim()) r[1] = r[4].trim(); });
     // Each colour starts at its best rank. Uncoloured rows after the last colour become White.
     const starts = {};
     for (const [rank, , col] of rows) if (col && !(starts[col] <= rank)) starts[col] = rank;
@@ -2114,7 +2118,7 @@ class PortraitStage {
         return h('div', { class: 'slide p-effort', style: '--c:' + b.c + ';--ink:' + b.ink },
           h('div', { class: 'ef-band' }, h('div', { class: 'ef-star' }), h('div', {}, h('div', { class: 'ef-eb', text: 'Effort board' }), h('div', { class: 'ef-title', text: b.name ? b.name + ' Effort' : 'Effort' })),
             h('div', { class: 'ef-count', text: b.rows.length })),
-          h('div', { class: 'ef-names', style: 'grid-template-rows:repeat(' + Math.ceil(s.pageRows.length / 3) + ',auto)' }, s.pageRows.map(r => h('div', { class: 'ef-nm' }, h('i', { text: r[0] }), h('b', { text: r[1] }), effortScore(r)))),
+          h('div', { class: 'ef-names', style: 'grid-template-rows:repeat(' + Math.ceil(s.pageRows.length / 3) + ',auto)' }, s.pageRows.map(r => h('div', { class: 'ef-nm' }, h('i', { text: r[0] }), h('b', { text: r[1], style: String(r[1]).length > 12 ? 'font-size:' + Math.max(19, Math.round(28 * 12 / String(r[1]).length)) + 'px' : null }), effortScore(r)))),
           s.pages > 1 ? h('div', { class: 'ef-page', text: 'Page ' + s.page + ' of ' + s.pages }) : null);
       }
       case 'list': {
