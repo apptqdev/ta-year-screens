@@ -734,7 +734,7 @@ function fillEffortTakeover(box, year, side) {
     box.replaceChildren(h('div', { class: 'efx ' + (port ? 'port' : 'land'), style: 'width:' + W + 'px;height:' + H + 'px' },
       h('div', { class: 'efx-top' }, logo, h('div', { class: 'efx-yr', text: yearName(year) }), h('div', { class: 'efx-eb', text: 'Effort boards' })),
       h('div', { class: 'efx-body' }, bands.map(b => h('div', { class: 'efx-sec', style: '--c:' + b.c + ';--ink:' + b.ink },
-        h('div', { class: 'efx-band' }, h('span', { class: 'st', text: '\u2605' }), h('div', { class: 'tt', text: b.name + ' Effort' }), h('div', { class: 'ct', text: b.rows.length })),
+        h('div', { class: 'efx-band' }, h('span', { class: 'st', text: '\u2605' }), h('div', { class: 'tt', text: b.name + ' Effort' })),
         h('div', { class: 'efx-names' }, b.rows.map(r => h('div', { class: 'efx-nm', style: '--c:' + b.c }, h('i', { text: r[0] }), h('b', { text: r[1] }), effortScore(r)))))))));
     box._fit = null;
   }
@@ -2117,7 +2117,7 @@ class PortraitStage {
         const b = s.band;
         return h('div', { class: 'slide p-effort', style: '--c:' + b.c + ';--ink:' + b.ink },
           h('div', { class: 'ef-band' }, h('div', { class: 'ef-star' }), h('div', {}, h('div', { class: 'ef-eb', text: 'Effort board' }), h('div', { class: 'ef-title', text: b.name ? b.name + ' Effort' : 'Effort' })),
-            h('div', { class: 'ef-count', text: b.rows.length })),
+            ), // no pupil count in the banner (Adam, 16 Nov 2026)
           h('div', { class: 'ef-names', style: 'grid-template-rows:repeat(' + Math.ceil(s.pageRows.length / 2) + ',auto)' }, s.pageRows.map(r => h('div', { class: 'ef-nm' }, h('i', { text: r[0] }), h('b', { text: r[1], style: String(r[1]).length > 20 ? 'font-size:' + Math.max(16, Math.round(28 * 20 / String(r[1]).length)) + 'px' : null }), effortScore(r)))),
           s.pages > 1 ? h('div', { class: 'ef-page', text: 'Page ' + s.page + ' of ' + s.pages }) : null);
       }
