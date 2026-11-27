@@ -419,6 +419,7 @@ table.lt th { color: var(--muted); font-size: .78rem; text-transform: uppercase;
 .scard .item { border: 0; padding: 0; }
 .scard:not(.sel) > .hint, .scard:not(.sel) > .item { display: none; }
 .scard:not(.sel) { cursor: pointer; }
+.scard.ff > .item { display: grid; } .scard.ff { cursor: default; } /* Fun Friday cards stay open */
 .addrow { display: flex; gap: 10px; align-items: end; flex-wrap: wrap; margin-top: 14px; }
 select { background: var(--bg); border: 1px solid var(--line); border-radius: 7px; padding: 8px 10px; color: var(--ink); font-weight: 400; }
 .groups-form { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 8px; }
@@ -662,6 +663,10 @@ const newSlide = type => ({ id: uid(), type, hidden: false, ...clone(SLIDE_DEFAU
 // Only today's Learning Legends are shown, so a "Yesterday's Learning Legends" slide is dropped from the screen and
 // the editor, and goes from the saved screen on the next Save (Adam, 9 Oct 2026).
 const isYesterdayLegends = s => s && s.type === 'list' && /learning legend/i.test(s.title || '') && /yesterday|previous|last/i.test(s.title || '');
+// Fun Friday lives on the right-hand screen's doc (Adam, 27 Nov 2026). Until that screen has been saved with it,
+// the single image uploaded in the centre editor before then still shows.
+const funFridayItems = (side, centre) => side && side.funFriday ? (side.funFriday.items || [])
+  : centre && centre.funFriday && centre.funFriday.photo ? [{ id: 'old', title: '', photo: centre.funFriday.photo }] : [];
 const normalSide = d => { const o = Object.assign({ slides: [], slideSeconds: 12 }, d ? clone(d) : {}); o.slides = (o.slides || []).filter(s => !isYesterdayLegends(s)); return o; };
 const lines = t => String(t || '').split('\n').map(s => s.trim()).filter(Boolean);
 const splitPerson = line => { const p = line.split(/\t| [-–] |,\s*/); return { name: (p[0] || '').trim(), group: (p[1] || '').trim(), extra: (p[2] || '').trim() }; };
@@ -2092,9 +2097,9 @@ class PortraitStage {
     list = list.flatMap(s => s.type === 'effort' ? effortPages(s).filter(p => !s._only || s._only.includes(p.band.key)) : pagedList(s)).map(s => s.type === 'list' && /learning legend/i.test(s.title || '') ? Object.assign({}, s, { seconds: LEGENDS_SECONDS }) : s);
     const aw = !this.pinned && this.side === 'right' && todaysAwareness(); // awareness day posters go first, on the right-hand screen only
     if (aw) list = [{ id: '_aw', type: 'awareness', key: aw.key }, ...list];
-    // Fun Friday image (uploaded in the centre screen's editor): first on the right-hand screen, Fridays only (Adam, 27 Nov 2026).
-    const ff = this.centre.funFriday && this.centre.funFriday.photo;
-    if (!this.pinned && this.side === 'right' && ff && new Date(effDay() + 'T12:00:00').getDay() === 5) list = [{ id: '_ff', type: 'funfri', photo: ff }, ...list];
+    // Fun Friday GIFs: first on the right-hand screen, Fridays only, one slide per GIF that is switched on (Adam, 27 Nov 2026).
+    if (!this.pinned && this.side === 'right' && new Date(effDay() + 'T12:00:00').getDay() === 5)
+      list = [...funFridayItems(this.data, this.centre).filter(x => !x.hidden && x.photo).map(x => ({ id: '_ff' + x.id, type: 'funfri', photo: x.photo })), ...list];
     const usesCentre = list.some(s => s.type === 'housepoints' || s.type === 'sotw');
     const key = JSON.stringify([list, usesCentre ? [this.centre.housePoints, this.centre.sotw] : 0, todayISO(), store.mascots]);
     if (key === this.slideKey) return;
@@ -2446,16 +2451,7 @@ function viewEdit(y) {
       h('p', { class: 'hint', text: 'Trips, competitions, achievements. Celebrations set to All year groups show on every year\'s screen and can be edited from any year. A photo fills the slide; without one it shows as a bold colour card. Check photo consent before uploading.' }),
       cList, h('button', { class: 'btn', style: 'margin-top:12px', type: 'button', onclick: () => { draft.celebrations.push({ id: uid(), title: '', caption: '', photo: '', all: true }); touch(); renderC(); }, text: 'Add celebration' })));
 
-    // Fun Friday: one image, shown on Fridays only, and not at all until one is uploaded.
-    draft.funFriday = draft.funFriday || { photo: '' };
-    const fBox = h('div', { style: 'display:flex;gap:10px;align-items:center;flex-wrap:wrap' });
-    const renderF = () => fBox.replaceChildren(...[draft.funFriday.photo ? h('img', { class: 'thumb', src: photoUrl(draft.funFriday.photo), alt: '' }) : h('div', { class: 'thumb' }),
-      assets ? h('label', { class: 'btn small', for: 'ff-file' }, draft.funFriday.photo ? 'Replace image' : 'Add image',
-        h('input', { id: 'ff-file', type: 'file', accept: 'image/*', hidden: true, onchange: e => upload(e.target.files[0], draft.funFriday, renderF) })) : h('span', { class: 'note', text: 'Image upload needs Editor access.' }),
-      draft.funFriday.photo ? h('button', { class: 'btn small ghost', type: 'button', onclick: () => { draft.funFriday.photo = ''; touch(); renderF(); }, text: 'Remove image' }) : null].filter(Boolean));
-    renderF();
-    form.append(h('fieldset', {}, h('legend', { text: 'Fun Friday' }),
-      h('p', { class: 'hint', text: 'Upload an image and it shows first on the right-hand screen every Friday, as a whole slide. Nothing shows until an image is added; remove it to stop it.' }), fBox));
+    // Fun Friday moved to the right-hand screen's editor (Adam, 27 Nov 2026).
 
     // House points aren't typed in here: they come from Arbor (or Supabase) into housePoints.
 
@@ -2673,6 +2669,34 @@ function viewEditSide(y, side) {
     return card;
   }
 
+  // Fun Friday: a set of GIFs (one per activity). Every GIF switched on plays first on this screen on Fridays.
+  function funFridayFieldset() {
+    if (!draft.funFriday) draft.funFriday = { items: clone(funFridayItems(null, store.screens[y])).map(x => Object.assign(x, { id: uid() })) };
+    const items = draft.funFriday.items, box = h('div', { class: 'items' });
+    const render = () => box.replaceChildren(...(items.length ? items.map((x, i) => {
+      const fileId = 'ff-' + x.id + '-file', showId = 'ff-' + x.id + '-show';
+      const show = h('input', { type: 'checkbox', id: showId }); show.checked = !x.hidden;
+      show.addEventListener('change', () => { x.hidden = !show.checked; touch(); render(); });
+      const up = assets ? h('label', { class: 'btn small', for: fileId }, x.photo ? 'Replace GIF' : 'Add GIF',
+        h('input', { id: fileId, type: 'file', accept: 'image/gif,image/*', hidden: true, onchange: async e => {
+          const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+          setStatus('Uploading ' + f.name + '\u2026');
+          try { x.photo = await uploadImage(f); if (!x.title) x.title = f.name.replace(/\.[^.]+$/, ''); touch(); render(); setStatus('GIF added. Save to put it on screen.'); }
+          catch (err) { setStatus(uploadError(err), 'bad'); }
+        } })) : h('span', { class: 'note', text: 'Upload needs Editor access.' });
+      return h('div', { class: 'scard ff' + (x.hidden ? ' off' : '') },
+        h('div', { class: 'shead' }, h('span', { class: 'pill', text: 'Fun Friday' }), h('span', { class: 'stitle', text: x.title || 'New GIF' }), h('label', { class: 'showtog', for: showId }, show, 'On screen')),
+        h('div', { class: 'item' }, field('Activity (for staff)', 'ff-' + x.id + '-t', x.title, v => x.title = v),
+          h('div', { class: 'wide', style: 'display:flex;gap:10px;align-items:center;flex-wrap:wrap' },
+            x.photo ? h('img', { class: 'thumb', src: photoUrl(x.photo), alt: '' }) : h('div', { class: 'thumb' }), up)),
+        h('div', { class: 'tools', style: 'display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap' }, moveBtns(items, i, render), removeBtn(items, i, render)));
+    }) : [h('div', { class: 'empty', text: 'No Fun Friday GIFs yet.' })]));
+    render();
+    return h('fieldset', {}, h('legend', { text: 'Fun Friday' }),
+      h('p', { class: 'hint', text: 'Keep a GIF for each activity and tick On screen for the ones you want this Friday. They play first on this screen on Fridays only, one after another. GIFs up to 20 MB.' }),
+      box, h('button', { class: 'btn', style: 'margin-top:12px', type: 'button', onclick: () => { items.push({ id: uid(), title: '', photo: '' }); touch(); render(); }, text: 'Add GIF' }));
+  }
+
   function buildForm() {
     form.replaceChildren();
     const list = h('div', { class: 'items' });
@@ -2688,6 +2712,7 @@ function viewEditSide(y, side) {
             const s = newSlide(typeSel.value); draft.slides.push(s); touch(); render(); focusSlide(s.id);
             const el = document.getElementById('sc-' + s.id); if (el) { el.scrollIntoView({ block: 'center' }); const f = el.querySelector('input:not([type=checkbox]), textarea'); f && f.focus(); }
           }, text: 'Add slide' }))),
+      side === 'right' ? funFridayFieldset() : null,
       h('fieldset', {}, h('legend', { text: 'Screen settings' }),
         h('div', { style: 'max-width:240px' }, field('Seconds per slide', 'secs', draft.slideSeconds, v => draft.slideSeconds = v, 'number', { min: 5, max: 60 }))));
     if (readOnly) form.querySelectorAll('input, textarea, button, select').forEach(el => el.disabled = true);
