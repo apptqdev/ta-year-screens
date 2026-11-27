@@ -559,6 +559,7 @@ const TAKEOVERS = [
   { date: '2026-11-11', at: '10:59', minutes: 4, text: 'Two minutes\u2019 silence', sub: 'We will remember them', kind: 'remembrance' }, // Armistice Day, 10:59 to 11:03
   // 10 Days of Christmas teaser (Adam, 27 Nov 2026): for one minute a snowy scene fills all three TVs and Santa flies
   // left to right towing a "Coming Soon" banner. School days 30 Nov to 4 Dec, before school, at break 1 and at lunch.
+  { date: '2026-11-27', at: '14:55', minutes: 35, kind: 'xmasteaser', text: '10 Days of Christmas' }, // Adam, 27 Nov 2026: play it on a loop until 15:30 today
   ...['08:00', '08:05', '08:10', '10:55', '11:05', '11:15', '13:05', '13:15', '13:25'].map(at => ({ from: '2026-11-30', to: '2026-12-04', at, minutes: 1, kind: 'xmasteaser', text: '10 Days of Christmas' })),
 ];
 function activeTakeover(now = new Date(), side = null, year = null) {
@@ -644,7 +645,7 @@ ${logo(1260, 520)}${logo(120, 110)}${logo(3240, 110)}
     // Seconds into this showing: from the synced clock, or the current minute when previewing a date and time.
     const now = syncedNow();
     const sec = previewTime != null ? (now.getSeconds() + now.getMilliseconds() / 1000)
-      : (now - new Date(effDay(now) + 'T' + take.at.padStart(5, '0') + ':00')) / 1000;
+      : ((now - new Date(effDay(now) + 'T' + take.at.padStart(5, '0') + ':00')) / 1000) % 60; // a longer showing replays every minute
     xtDraw(box._xt, Math.max(0, sec));
     requestAnimationFrame(frame);
   };
