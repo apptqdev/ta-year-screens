@@ -179,7 +179,8 @@ table.lt th { color: var(--muted); font-size: .78rem; text-transform: uppercase;
 .slide.celebrate.text .s-body { color: #fff; }
 .slide.celebrate img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 /* Fun Friday: the whole image, uncropped, on a dark ground */
-.slide.funfri { background: #0E1116; } .slide.funfri img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+.slide.funfri { background: #0E1116; overflow: hidden; } .slide.funfri img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+.slide.funfri .ff-blur { position: absolute; inset: -60px; background-size: cover; background-position: center; filter: blur(40px) brightness(.55); }
 .slide.celebrate .cap { position: absolute; left: 0; right: 0; bottom: 0; padding: 140px 56px 74px; background: linear-gradient(transparent, rgba(17,18,20,.92) 55%); color: #F4F4F2; }
 .slide.celebrate .cap .s-eyebrow { color: #F2CF7A; } .slide.celebrate .cap .s-body { color: #F4F4F2; }
 .slide.celebrate .cap .s-title { font-size: 72px; }
@@ -1901,9 +1902,7 @@ class Stage {
   }
   buildSlides() {
     const s = this.scr, list = [], today = todayISO();
-    // Fun Friday image (Adam, 9 Oct 2026): first slide, on Fridays only, and only once an image is uploaded.
-    const ff = s.funFriday && s.funFriday.photo;
-    if (ff && new Date(effDay() + 'T12:00:00').getDay() === 5) list.push({ type: 'funfri', photo: ff });
+    // Fun Friday moved to the right-hand screen (Adam, 27 Nov 2026), see PortraitStage.buildSlides.
     if (s.sotw.students.filter(x => x.name).length) list.push({ type: 'sotw', sotw: s.sotw }); // the content is part of the key, so edits redraw it
     s.celebrations.filter(c => c.title || c.photo).forEach((c, i) => list.push({ type: 'celebrate', c, color: HC[(i * 3 + 1) % 8] }));
     s.notices.filter(n => n.title && (!n.until || n.until >= today)).forEach((n, i) => list.push({ type: 'notice', n, color: HC[(i * 5 + 2) % 8] }));
@@ -2093,6 +2092,9 @@ class PortraitStage {
     list = list.flatMap(s => s.type === 'effort' ? effortPages(s).filter(p => !s._only || s._only.includes(p.band.key)) : pagedList(s)).map(s => s.type === 'list' && /learning legend/i.test(s.title || '') ? Object.assign({}, s, { seconds: LEGENDS_SECONDS }) : s);
     const aw = !this.pinned && this.side === 'right' && todaysAwareness(); // awareness day posters go first, on the right-hand screen only
     if (aw) list = [{ id: '_aw', type: 'awareness', key: aw.key }, ...list];
+    // Fun Friday image (uploaded in the centre screen's editor): first on the right-hand screen, Fridays only (Adam, 27 Nov 2026).
+    const ff = this.centre.funFriday && this.centre.funFriday.photo;
+    if (!this.pinned && this.side === 'right' && ff && new Date(effDay() + 'T12:00:00').getDay() === 5) list = [{ id: '_ff', type: 'funfri', photo: ff }, ...list];
     const usesCentre = list.some(s => s.type === 'housepoints' || s.type === 'sotw');
     const key = JSON.stringify([list, usesCentre ? [this.centre.housePoints, this.centre.sotw] : 0, todayISO(), store.mascots]);
     if (key === this.slideKey) return;
@@ -2107,6 +2109,7 @@ class PortraitStage {
   slideEl(s, i) {
     if (s.type === 'awareness') return awarenessEl(s.key);
     if (s.type === 'value') return valueEl();
+    if (s.type === 'funfri') return h('div', { class: 'slide funfri side' }, h('div', { class: 'ff-blur', style: `background-image:url("${photoUrl(s.photo)}")` }), h('img', { src: photoUrl(s.photo), alt: 'Fun Friday' }));
     const c = HC[(i * 3 + 1) % 8];
     const wrap = (cls, ...kids) => h('div', { class: 'slide ' + cls, style: '--c:' + c }, ...kids);
     const pad = (...kids) => h('div', { class: 'pp' }, ...kids);
@@ -2452,7 +2455,7 @@ function viewEdit(y) {
       draft.funFriday.photo ? h('button', { class: 'btn small ghost', type: 'button', onclick: () => { draft.funFriday.photo = ''; touch(); renderF(); }, text: 'Remove image' }) : null].filter(Boolean));
     renderF();
     form.append(h('fieldset', {}, h('legend', { text: 'Fun Friday' }),
-      h('p', { class: 'hint', text: 'Upload an image and it shows first on this screen every Friday, as a whole slide. Nothing shows until an image is added; remove it to stop it.' }), fBox));
+      h('p', { class: 'hint', text: 'Upload an image and it shows first on the right-hand screen every Friday, as a whole slide. Nothing shows until an image is added; remove it to stop it.' }), fBox));
 
     // House points aren't typed in here: they come from Arbor (or Supabase) into housePoints.
 
