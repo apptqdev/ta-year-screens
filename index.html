@@ -1400,6 +1400,7 @@ function viewLogin(a, want) {
       h('p', { text: want && !a.years.includes(want) ? 'You can\'t edit ' + yearName(want) + '. Choose one of your screens:' : 'Choose the screens to edit:' }),
       h('div', { class: 'years-go' }, a.years.map(editLink), TUTOR_SLIDES ? null : h('a', { class: 'btn', href: '#homework', text: 'Homework' })),
       a.admin && (window.SCREENS_BACKEND || {}).displays ? h('a', { class: 'btn ghost', href: '#displays', text: 'TV links (no sign-in on the TVs)' }) : null,
+      a.admin ? refreshAllBtn() : null,
       ];
     app.replaceChildren(signinShell(...body));
   };
@@ -1531,6 +1532,19 @@ function seenText(iso) {
   return m < 5 ? 'On now' : m < 60 ? 'Last seen ' + m + ' min ago' : m < 1440 ? 'Last seen ' + Math.round(m / 60) + ' h ago'
     : 'Last seen ' + new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
 }
+// "Refresh all screens" (admins, Adam 27 Nov 2026): every TV watches config/refresh and reloads when it changes,
+// so a new version goes on screen without visiting each TV. Signed-in TVs reload at once, TV links within two minutes.
+function refreshAllBtn() {
+  const note = h('span', { class: 'note', role: 'status' });
+  const btn = h('button', { class: 'btn ghost', type: 'button', text: 'Refresh all screens', onclick: async () => {
+    btn.disabled = true;
+    try { await db.doc('config/refresh').set({ at: new Date().toISOString() }); note.textContent = ' Done. Every TV will reload within two minutes.'; }
+    catch (e) { note.textContent = ' That didn\u2019t work. Check you are signed in as the screens administrator.'; }
+    setTimeout(() => { btn.disabled = false; }, 5000);
+  } });
+  return h('div', {}, btn, note);
+}
+
 function viewDisplays() {
   const tok = routeTok;
   viewLogin({ state: 'loading' });
@@ -2442,6 +2456,12 @@ function viewScreen(y, side) {
     else stage.setData(store.screens[y], store.lessons[y]);
   };
   listeners.add(fill); subscribe(y); fill();
+  // Reload when an admin presses "Refresh all screens" (config/refresh changes after this page loaded).
+  let refreshAt;
+  const unRefresh = db ? db.doc('config/refresh').onSnapshot(s => {
+    const at = s.exists ? (s.data() || {}).at || null : null;
+    if (refreshAt === undefined) refreshAt = at; else if (at !== refreshAt) location.reload();
+  }, () => {}) : null;
   const poppy = h('div', { class: 'to-poppy', hidden: true }); poppy.innerHTML = AWARENESS_DAYS.find(a => a.key === 'armistice').art;
   const takeover = h('div', { class: 'takeover', hidden: true, role: 'alert' }, logoImg(), poppy, h('div', { class: 'to-pre', hidden: true }), h('div', { class: 'to-text' }), h('div', { class: 'to-lessons', hidden: true }), h('div', { class: 'to-effort', hidden: true }), h('div', { class: 'to-xmas', hidden: true }), h('div', { class: 'to-sub', text: VALUES_LINE }));
   takeover.dataset.side = side || ''; app.append(takeover);
@@ -2458,7 +2478,7 @@ function viewScreen(y, side) {
     try { await document.documentElement.requestFullscreen(); } catch (e) { /* not available here */ }
     try { lock = await navigator.wakeLock.request('screen'); } catch (e) { /* optional */ }
   }
-  cleanup = () => { clearInterval(toTimer); takeover.remove(); listeners.delete(fill); stage.destroy(); document.removeEventListener('pointermove', wake); clearTimeout(idleT); try { lock && lock.release(); } catch (e) {} };
+  cleanup = () => { unRefresh && unRefresh(); clearInterval(toTimer); takeover.remove(); listeners.delete(fill); stage.destroy(); document.removeEventListener('pointermove', wake); clearTimeout(idleT); try { lock && lock.release(); } catch (e) {} };
 }
 
 function viewEdit(y) {
