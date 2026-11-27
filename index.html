@@ -10,7 +10,7 @@
 <script src="backend.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400;1,600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Mountains+of+Christmas:wght@700&family=Open+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400;1,600&display=swap">
 <style>
 /* Layout: the TV screen is a fixed 1920x1080 stage scaled to fit (header, spotlight + "up next" column, ticker, house-colour band).
    Editing pages are a plain two-column tool: form on the left, live preview of the screen on the right. */
@@ -243,6 +243,10 @@ table.lt th { color: var(--muted); font-size: .78rem; text-transform: uppercase;
 .takeover.effort { padding: 0; background: #0b0c0e; }
 .takeover.effort > .ta-logo { display: none; }
 .to-effort { position: absolute; inset: 0; overflow: hidden; text-align: left; }
+/* 10 Days of Christmas teaser: one snowy scene spread over the three TVs (Adam, 27 Nov 2026). */
+.takeover.xmasteaser { padding: 0; background: #0b1230; animation: to-in 1s ease-out; }
+.takeover.xmasteaser > :not(.to-xmas) { display: none; }
+.to-xmas { position: absolute; inset: 0; overflow: hidden; } .to-xmas svg { width: 100%; height: 100%; display: block; }
 .efx { position: absolute; left: 0; top: 0; transform-origin: 0 0; background: #111214; box-sizing: border-box; padding: 32px 40px; display: flex; flex-direction: column; gap: 18px; overflow: hidden; color: #F4F4F2; }
 .efx-top { display: flex; align-items: center; gap: 22px; } .efx-top .ta-logo { height: 90px; filter: invert(1); }
 .efx-yr { font: 700 80px/1 Arial, sans-serif; letter-spacing: -.02em; } .efx-eb { margin-left: auto; font-weight: 700; font-size: 28px; letter-spacing: .14em; text-transform: uppercase; color: #F2CF7A; }
@@ -553,17 +557,124 @@ const TAKEOVERS = [
   { date: '2026-11-18', at: '10:55', minutes: 25, kind: 'effort' }, // 10:55 to 11:20
   { date: '2026-11-18', at: '13:05', minutes: 25, kind: 'effort' }, // 13:05 to 13:30
   { date: '2026-11-11', at: '10:59', minutes: 4, text: 'Two minutes\u2019 silence', sub: 'We will remember them', kind: 'remembrance' }, // Armistice Day, 10:59 to 11:03
+  // 10 Days of Christmas teaser (Adam, 27 Nov 2026): for one minute a snowy scene fills all three TVs and Santa flies
+  // left to right towing a "Coming Soon" banner. School days 30 Nov to 4 Dec, before school, at break 1 and at lunch.
+  ...['08:00', '08:05', '08:10', '10:55', '11:05', '11:15', '13:05', '13:15', '13:25'].map(at => ({ from: '2026-11-30', to: '2026-12-04', at, minutes: 1, kind: 'xmasteaser', text: '10 Days of Christmas' })),
 ];
 function activeTakeover(now = new Date(), side = null, year = null) {
   const day = effDay(now), wd = new Date(day + 'T12:00:00').getDay();
   const m = previewTime != null ? previewTime : now.getHours() * 60 + now.getMinutes();
-  return TAKEOVERS.find(t => (!t.centre || !side) && (t.kind !== 'effort' || (year && yearEffort(year, true))) && (t.date ? t.date === day : wd >= 1 && wd <= 5 && (!t.kind || isSchoolDay(new Date(day + 'T12:00:00'))))
-    && m >= toMin(t.at) && m < toMin(t.at) + t.minutes) || null;
+  // The Christmas teaser runs on the website's clock (syncedNow), so all three TVs start Santa together.
+  const sn = syncedNow(), ms = previewTime != null ? previewTime : sn.getHours() * 60 + sn.getMinutes();
+  return TAKEOVERS.find(t => (!t.centre || !side) && (t.kind !== 'effort' || (year && yearEffort(year, true)))
+    && (t.date ? t.date === day : t.from ? day >= t.from && day <= t.to && isSchoolDay(new Date(day + 'T12:00:00')) : wd >= 1 && wd <= 5 && (!t.kind || isSchoolDay(new Date(day + 'T12:00:00'))))
+    && (mm => mm >= toMin(t.at) && mm < toMin(t.at) + t.minutes)(t.kind === 'xmasteaser' ? ms : m)) || null;
+}
+// TV clocks can drift by seconds. The website's Date header gives the real time to the second; a few samples at
+// different moments narrow it to a fraction of a second. Used for the Christmas teaser only.
+let clockOffset = 0;
+const syncedNow = () => new Date(Date.now() + clockOffset);
+async function syncClock() {
+  let lo = -Infinity, hi = Infinity;
+  for (let i = 0; i < 5; i++) {
+    try {
+      const t0 = Date.now(), r = await fetch(location.pathname + '?clock=' + t0, { method: 'HEAD', cache: 'no-store' }), t1 = Date.now();
+      const d = Date.parse(r.headers.get('date') || ''); if (!d || t1 - t0 > 1500) continue;
+      lo = Math.max(lo, d - t1); hi = Math.min(hi, d + 1000 - t0); // the server read its clock some time between t0 and t1
+    } catch (e) { /* offline: keep the TV's own clock */ }
+    await new Promise(r => setTimeout(r, 230));
+  }
+  if (lo <= hi && isFinite(lo) && isFinite(hi) && Math.abs((lo + hi) / 2) < 6 * 3600e3) clockOffset = Math.round((lo + hi) / 2);
+}
+syncClock(); setInterval(syncClock, 3600e3);
+// The 10 Days of Christmas teaser scene. All three TVs draw the same 4320x2040 world (the TVs side by side, as on the
+// wall) and each shows only its own part of it, so Santa leaves one screen and appears on the next.
+const XT_VIEW = { left: '60 60 1080 1920', '': '1200 480 1920 1080', right: '3180 60 1080 1920' };
+const XT_RECT = { left: [60, 1140], '': [1200, 3120], right: [3180, 4260] };
+const XT_DEFS = `<linearGradient id="xt-sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#050a22"/><stop offset=".55" stop-color="#13265a"/><stop offset="1" stop-color="#2c4f8a"/></linearGradient>
+<radialGradient id="xt-glow"><stop offset="0" stop-color="#fff6d8" stop-opacity=".55"/><stop offset="1" stop-color="#fff6d8" stop-opacity="0"/></radialGradient>
+<linearGradient id="xt-snow" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f4f8ff"/><stop offset="1" stop-color="#b9cbe6"/></linearGradient>
+<linearGradient id="xt-snow2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#cfdcf0"/><stop offset="1" stop-color="#8fa7cc"/></linearGradient>`;
+const XT_TREE = '<path d="M0-260 L70-150 H40 L100-60 H60 L130 40 H-130 L-60-60 H-100 L-40-150 H-70Z" fill="#1d5a3a"/><path d="M0-260 L50-182 Q0-170 -50-182Z M-22-150 Q0-138 40-150 L60-118 Q0-104 -60-118Z M-40-60 Q10-46 60-60 L88-24 Q0-6 -88-24Z" fill="#f4f8ff"/><rect x="-16" y="40" width="32" height="40" fill="#4a2f1b"/>';
+const XT_HOUSE = '<rect x="-110" y="-120" width="220" height="140" fill="#2a2f45"/><path d="M-140-110 L0-220 L140-110Z" fill="#f4f8ff"/><rect x="-80" y="-80" width="50" height="50" fill="#ffcf6b"/><rect x="30" y="-80" width="50" height="50" fill="#ffcf6b"/><rect x="-20" y="-40" width="40" height="60" fill="#E0AA2E"/><rect x="60" y="-215" width="30" height="70" fill="#2a2f45"/><rect x="54" y="-225" width="42" height="14" fill="#f4f8ff"/>';
+const XT_DEER = '<ellipse cx="0" cy="0" rx="62" ry="26" fill="#8B5A2B"/><ellipse cx="-10" cy="8" rx="40" ry="14" fill="#C49A6C"/><path d="M48-12 L78-52 L92-46 L66-6Z" fill="#8B5A2B"/><ellipse cx="96" cy="-56" rx="24" ry="14" fill="#8B5A2B"/><circle cx="118" cy="-54" r="7" fill="#E53935"/><circle cx="94" cy="-60" r="3.5" fill="#111"/><path d="M86-68 L78-104 M80-92 L64-104 M84-82 L70-88 M96-68 L104-102 M102-90 L118-100" stroke="#5D3A1A" stroke-width="6" stroke-linecap="round" fill="none"/><path d="M-62-6 L-80-18" stroke="#EFE7DA" stroke-width="8" stroke-linecap="round"/><g class="xt-legs" stroke="#6B4423" stroke-width="9" stroke-linecap="round"></g><rect x="-30" y="-28" width="12" height="56" rx="4" fill="#C62828"/><circle cx="-24" cy="-34" r="7" fill="#F2CF7A"/>';
+const XT_SLEIGH = '<path d="M-20 60 Q-40 60 -40 40" stroke="#E0AA2E" stroke-width="8" fill="none"/><path d="M-30 62 H300 Q340 62 350 30" stroke="#E0AA2E" stroke-width="9" fill="none" stroke-linecap="round"/><path d="M0 40 L20-40 H120 Q140-40 140-20 V0 H260 Q300 0 300-50 L320-60 Q330 40 270 44 H10Z" fill="#C62828"/><path d="M20-40 H120 Q140-40 140-20 V0 H260" stroke="#E0AA2E" stroke-width="6" fill="none"/><ellipse cx="200" cy="-10" rx="70" ry="28" fill="#6B3E1F"/><rect x="170" y="-50" width="60" height="44" rx="8" fill="#2E7D32"/><rect x="196" y="-50" width="8" height="44" fill="#F2CF7A"/><ellipse cx="90" cy="-62" rx="44" ry="40" fill="#D32F2F"/><circle cx="96" cy="-118" r="26" fill="#F5C9A8"/><path d="M70-110 Q96-60 122-110 Q110-96 96-98 Q82-96 70-110Z" fill="#FAFAFA"/><path d="M70-124 Q90-170 130-150 L140-124Z" fill="#D32F2F"/><circle cx="142" cy="-150" r="10" fill="#FAFAFA"/><rect x="66" y="-130" width="78" height="12" rx="6" fill="#FAFAFA"/><circle cx="104" cy="-120" r="3" fill="#111"/><path d="M120-70 L170-90" stroke="#D32F2F" stroke-width="16" stroke-linecap="round"/><circle cx="172" cy="-92" r="9" fill="#FAFAFA"/>';
+const XT_FONT = "'Mountains of Christmas', Georgia, serif";
+const XT_T0 = 1, XT_SPEED = 520, XT_BL = 1250;
+const xtPathX = t => -300 + (t - XT_T0) * XT_SPEED, xtPathY = x => 1060 - 120 * Math.sin(x / 4320 * Math.PI) + 22 * Math.sin(x / 420);
+const xtPassed = sx => XT_T0 + (sx + 1900) / XT_SPEED; // when the end of the banner has left the screen whose right edge is sx
+function xmasTeaser(box, side, t) {
+  if (!box._xt || box._xt.side !== side) {
+    let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    const [x0, x1] = XT_RECT[side] || XT_RECT[''], inView = x => x > x0 - 60 && x < x1 + 60;
+    const stars = [], flakes = [];
+    for (let i = 0; i < 260; i++) { const x = rnd() * 4320, y = rnd() * 1300, r = 1.5 + rnd() * 3.5, p = rnd() * 6; if (inView(x)) stars.push([x, y, r, p]); }
+    for (let i = 0; i < 420; i++) { const f = [rnd() * 4320, rnd() * 2040, 2 + rnd() * 7, 40 + rnd() * 90, rnd() * 6]; if (inView(f[0])) flakes.push(f); }
+    const put = (art, x, y, sc) => `<g transform="translate(${x},${y}) scale(${sc})">${art}</g>`;
+    const far = [[200, 1520, .8], [380, 1500, .6], [1350, 1500, .7], [1700, 1490, .55], [2900, 1480, .65], [3400, 1480, .7], [3600, 1470, .5], [4100, 1440, .75]].map(a => put(XT_TREE, ...a)).join('')
+      + put(XT_HOUSE, 2250, 1500, .9) + put(XT_HOUSE, 2560, 1490, .7) + put(XT_HOUSE, 900, 1540, .8);
+    const near = [[150, 1760, 1.3], [1000, 1700, 1.1], [1260, 1700, 1], [3050, 1690, 1.1], [3300, 1680, 1.3], [4200, 1700, 1.2]].map(a => put(XT_TREE, ...a)).join('');
+    const logo = (x, y) => `<image href="media/ta-logo.png" x="${x}" y="${y}" width="320" height="120" preserveAspectRatio="xMinYMin meet" style="filter:invert(1)" opacity=".9"/>`;
+    const deer = [[520, 26], [670, 0], [820, 26], [970, 0]].map(([dx, dy]) => `<g class="xt-deer" data-x="${dx - 60}" data-y="${dy - 60}">${XT_DEER}</g>`).join('');
+    box.innerHTML = `<svg viewBox="${XT_VIEW[side] || XT_VIEW['']}" preserveAspectRatio="xMidYMid slice" aria-label="10 Days of Christmas, coming soon"><defs>${XT_DEFS}</defs>
+<rect width="4320" height="2040" fill="url(#xt-sky)"/><g class="xt-stars">${stars.map(([x, y, r, p]) => `<circle cx="${x}" cy="${y}" r="${r}" fill="#fff" data-p="${p}"/>`).join('')}</g>
+<circle cx="700" cy="420" r="360" fill="url(#xt-glow)"/><circle cx="700" cy="420" r="120" fill="#fdf3d2"/><circle cx="660" cy="390" r="22" fill="#efe2b8"/><circle cx="740" cy="460" r="14" fill="#efe2b8"/>
+<path d="M0 1560 Q500 1380 1100 1500 T2200 1460 T3300 1480 T4320 1400 V2040 H0Z" fill="url(#xt-snow2)"/>${far}
+<path d="M0 1700 Q600 1560 1300 1660 T2600 1640 T3600 1600 T4320 1640 V2040 H0Z" fill="url(#xt-snow)"/>${near}
+${logo(1260, 520)}${logo(120, 110)}${logo(3240, 110)}
+<g class="xt-cap" data-at="${xtPassed(1140)}" fill="#fff" text-anchor="middle"><text x="600" y="1090" font-family="${XT_FONT}" font-weight="700" font-size="120">10 treats</text><text x="600" y="1170" font-family="Arial, sans-serif" font-weight="700" font-size="56" fill="#F2CF7A" letter-spacing="4">FOR 10 SCHOOL DAYS</text></g>
+<g class="xt-cap" data-at="${xtPassed(3120)}" fill="#fff" text-anchor="middle"><text x="2160" y="720" font-family="Arial, sans-serif" font-weight="700" font-size="44" fill="#F2CF7A" letter-spacing="12">★ TORQUAY ACADEMY PRESENTS ★</text>
+ <text x="2160" y="920" font-family="${XT_FONT}" font-weight="700" font-size="190">10 Days of Christmas</text>
+ <rect x="1810" y="990" width="700" height="110" rx="55" fill="#C62828" stroke="#E0AA2E" stroke-width="6"/><text x="2160" y="1070" font-family="Arial, sans-serif" font-weight="700" font-size="66" letter-spacing="6">COMING SOON</text></g>
+<g class="xt-cap" data-at="${xtPassed(4260)}" fill="#fff" text-anchor="middle"><text x="3720" y="1040" font-family="Arial, sans-serif" font-weight="700" font-size="56" fill="#F2CF7A" letter-spacing="4">STARTS</text><text x="3720" y="1160" font-family="${XT_FONT}" font-weight="700" font-size="104">Monday 7 December</text></g>
+<g class="xt-team"><path class="xt-rope" stroke="#E0AA2E" stroke-width="5" fill="none"/><path class="xt-ban" fill="#C62828" stroke="#E0AA2E" stroke-width="8"/><path class="xt-mid" id="xt-mid-${side || 'c'}" fill="none"/>
+ <text font-family="${XT_FONT}" font-weight="700" font-size="76" fill="#fff"><textPath href="#xt-mid-${side || 'c'}" startOffset="50%" text-anchor="middle">10 Days of Christmas ★ Coming Soon</textPath></text>
+ <path d="M330 -40 Q600 10 960 -60" stroke="#E0AA2E" stroke-width="4" fill="none"/>${deer}<g class="xt-sleigh">${XT_SLEIGH}</g></g>
+<g class="xt-flakes" fill="#fff" opacity=".85">${flakes.map(() => '<circle/>').join('')}</g></svg>`;
+    const q = sel => box.querySelector(sel);
+    box._xt = { side, flakes, stars: [...box.querySelectorAll('.xt-stars circle')], flakeEls: [...box.querySelectorAll('.xt-flakes circle')], caps: [...box.querySelectorAll('.xt-cap')],
+      team: q('.xt-team'), rope: q('.xt-rope'), ban: q('.xt-ban'), mid: q('.xt-mid'), sleigh: q('.xt-sleigh'), deer: [...box.querySelectorAll('.xt-deer')] };
+  }
+  box._xtTake = t;
+  if (box._xtRun) return;
+  box._xtRun = true;
+  const frame = () => {
+    const take = box._xtTake;
+    if (!box.isConnected || box.hidden || !take) { box._xtRun = false; return; }
+    // Seconds into this showing: from the synced clock, or the current minute when previewing a date and time.
+    const now = syncedNow();
+    const sec = previewTime != null ? (now.getSeconds() + now.getMilliseconds() / 1000)
+      : (now - new Date(effDay(now) + 'T' + take.at.padStart(5, '0') + ':00')) / 1000;
+    xtDraw(box._xt, Math.max(0, sec));
+    requestAnimationFrame(frame);
+  };
+  requestAnimationFrame(frame);
+}
+function xtDraw(X, t) {
+  X.stars.forEach(c => c.setAttribute('opacity', (.45 + .55 * Math.abs(Math.sin(t * 1.6 + +c.dataset.p))).toFixed(2)));
+  X.flakes.forEach(([fx, fy, r, v, p], i) => { const c = X.flakeEls[i]; c.setAttribute('cx', (fx + 30 * Math.sin(t * .8 + p)).toFixed(1)); c.setAttribute('cy', ((fy + t * v) % 2040).toFixed(1)); c.setAttribute('r', r); });
+  X.caps.forEach(g => g.setAttribute('opacity', Math.max(0, Math.min(1, (t - +g.dataset.at) / .8))));
+  const x = xtPathX(t), y = xtPathY(x), ang = Math.atan2(xtPathY(x + 20) - y, 20) * 180 / Math.PI;
+  X.team.setAttribute('transform', `translate(${x.toFixed(1)},${y.toFixed(1)}) rotate(${ang.toFixed(2)}) scale(1.15)`);
+  X.team.style.display = x > 4320 + 1600 ? 'none' : '';
+  const pts = []; for (let i = 0; i <= 40; i++) pts.push([-90 - i * XT_BL / 40, 10 + Math.min(1, i / 6) * 22 * Math.sin(t * 6 - i * .35)]);
+  const f = n => n.toFixed(1);
+  X.rope.setAttribute('d', `M-30 40 Q-60 50 ${f(pts[3][0])} ${f(pts[3][1] - 62)} M-30 40 Q-60 60 ${f(pts[3][0])} ${f(pts[3][1] + 62)}`);
+  const body = pts.slice(3), tail = pts[40];
+  X.ban.setAttribute('d', 'M' + body.map(([a, b]) => f(a) + ' ' + f(b - 62)).join(' L') + ` L${f(tail[0] - 50)} ${f(tail[1])} L` + body.slice().reverse().map(([a, b]) => f(a) + ' ' + f(b + 62)).join(' L') + 'Z');
+  X.mid.setAttribute('d', 'M' + body.slice().reverse().map(([a, b]) => f(a) + ' ' + f(b + 22)).join(' L'));
+  X.deer.forEach((u, k) => {
+    u.setAttribute('transform', `translate(${u.dataset.x},${f(+u.dataset.y + 10 * Math.sin(t * 9 + k * 1.3))})`);
+    const a = Math.sin(t * 9 + k * 1.3) * .7;
+    u.querySelector('.xt-legs').innerHTML = [[-40, 1], [-20, -1], [30, 1], [46, -1]].map(([lx, s2]) => `<path d="M${lx} 14 l${f(Math.sin(a * s2) * 46)} ${f(Math.cos(a * s2) * 46)}"/>`).join('');
+  });
+  X.sleigh.setAttribute('transform', `translate(0,${f(-20 + 6 * Math.sin(t * 4))})`);
 }
 // Fill a full-screen message (the TV's, or the copy over an editor preview) for takeover t on a year's screen.
 function fillTakeover(el, t, year) {
   const lessons = t.kind === 'lessons';
   el.className = 'takeover' + (t.kind ? ' ' + t.kind : '');
+  const xb = $('.to-xmas', el); if (xb) { xb.hidden = t.kind !== 'xmasteaser'; if (t.kind === 'xmasteaser') { xmasTeaser(xb, el.dataset.side || '', t); return; } }
   $('.to-pre', el).textContent = t.pre || ''; $('.to-pre', el).hidden = !t.pre;
   $('.to-text', el).textContent = lessons ? '' : t.text; $('.to-text', el).hidden = lessons;
   $('.to-sub', el).textContent = t.sub || VALUES_LINE; $('.to-sub', el).hidden = lessons;
@@ -1683,6 +1794,7 @@ function datePreviewBar(stage, frame, side, openLink, key, onDate) {
   const EFFECT_NAMES = { fireworks: 'Fireworks Night', snow: 'Snow (last week before Christmas)', remembrance: 'Armistice Day (grey screens and poppy)' };
   const special = [
     ...EFFECTS.map(e => ({ label: EFFECT_NAMES[e.key] || e.key, date: e.from })),
+    { label: '10 Days of Christmas teaser (Santa)', date: '2026-11-30', time: '10:55' },
     ...TAKEOVERS.filter(t => t.date).map(t => ({ label: (t.kind === 'effort' ? 'Effort Boards release (break screens)' : t.text.replace('’', "'")) + ' (' + t.at + ')', date: t.date, time: t.at })),
     ...(side === 'right' ? AWARENESS_DAYS.map(a => ({ label: a.title + (a.eyebrow ? ' (' + a.eyebrow.replace(' · ', ', ') + ')' : '') + ' poster', date: a.only ? a.date : awarenessShowDay(a.date) })) : []),
   ].sort((a, b) => (a.date + (a.time || '')).localeCompare(b.date + (b.time || '')));
@@ -1692,7 +1804,7 @@ function datePreviewBar(stage, frame, side, openLink, key, onDate) {
   const reset = h('button', { class: 'btn small ghost', type: 'button', text: 'Back to today' });
   // A copy of the full-screen message, sized to the preview.
   const poppy = h('div', { class: 'to-poppy', hidden: true }); poppy.innerHTML = AWARENESS_DAYS.find(a => a.key === 'armistice').art;
-  const to = h('div', { class: 'takeover', hidden: true }, logoImg(), poppy, h('div', { class: 'to-pre', hidden: true }), h('div', { class: 'to-text' }), h('div', { class: 'to-lessons', hidden: true }), h('div', { class: 'to-effort', hidden: true }), h('div', { class: 'to-sub' }));
+  const to = h('div', { class: 'takeover', hidden: true }, logoImg(), poppy, h('div', { class: 'to-pre', hidden: true }), h('div', { class: 'to-text' }), h('div', { class: 'to-lessons', hidden: true }), h('div', { class: 'to-effort', hidden: true }), h('div', { class: 'to-xmas', hidden: true }), h('div', { class: 'to-sub' }));
   to.dataset.side = side || ''; frame.append(to);
   const apply = () => {
     previewDate = date.value || null;
@@ -2330,7 +2442,7 @@ function viewScreen(y, side) {
   };
   listeners.add(fill); subscribe(y); fill();
   const poppy = h('div', { class: 'to-poppy', hidden: true }); poppy.innerHTML = AWARENESS_DAYS.find(a => a.key === 'armistice').art;
-  const takeover = h('div', { class: 'takeover', hidden: true, role: 'alert' }, logoImg(), poppy, h('div', { class: 'to-pre', hidden: true }), h('div', { class: 'to-text' }), h('div', { class: 'to-lessons', hidden: true }), h('div', { class: 'to-effort', hidden: true }), h('div', { class: 'to-sub', text: VALUES_LINE }));
+  const takeover = h('div', { class: 'takeover', hidden: true, role: 'alert' }, logoImg(), poppy, h('div', { class: 'to-pre', hidden: true }), h('div', { class: 'to-text' }), h('div', { class: 'to-lessons', hidden: true }), h('div', { class: 'to-effort', hidden: true }), h('div', { class: 'to-xmas', hidden: true }), h('div', { class: 'to-sub', text: VALUES_LINE }));
   takeover.dataset.side = side || ''; app.append(takeover);
   let shown = null;
   const checkTakeover = () => {
